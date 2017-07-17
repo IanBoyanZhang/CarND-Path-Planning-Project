@@ -243,7 +243,7 @@ int main() {
           	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 						// Going cycles
 
-						double pos_x;
+						/*double pos_x;
 						double pos_y;
 						double angle;
 						int path_size = previous_path_x.size();
@@ -277,7 +277,7 @@ int main() {
 							next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
 							pos_x += (dist_inc)*cos(angle+(i+1)*(pi()/100));
 							pos_y += (dist_inc)*sin(angle+(i+1)*(pi()/100));
-						}
+						}*/
 
           	msgJson["next_x"] = next_x_vals;
           	msgJson["next_y"] = next_y_vals;
