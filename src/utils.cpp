@@ -8,9 +8,16 @@ void utils::smoother() {
 }
 
 void utils::globalCart2local(const double &car_x, const double &car_y,
-                             const double &map_waypoint_x,
-                             const double &map_waypoint_y,
-                             double &local_waypoint_x, double &local_waypoint_y) {
-  local_waypoint_x = map_waypoint_x - car_x;
-  local_waypoint_y = map_waypoint_y - car_y;
+                             const std::vector<double> &map_waypoints_x,
+                             const std::vector<double> &map_waypoints_y,
+                             std::vector<double> &local_waypoints_x,
+                             std::vector<double> &local_waypoints_y) {
+
+  for (auto map_x:map_waypoints_x) {
+    local_waypoints_x.push_back(map_x - car_x);
+  }
+
+  for (auto map_y:map_waypoints_y) {
+    local_waypoints_y.push_back(map_y - car_y);
+  }
 }
