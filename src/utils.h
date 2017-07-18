@@ -11,14 +11,14 @@
 class utils {
 
 public:
-  void smoother();
-
   void globalCart2local(const double& car_x, const double& car_y,
                         const std::vector<double>& map_waypoints_x,
                         const std::vector<double>& map_waypoints_y,
                         std::vector<double>& local_waypoints_x,
                         std::vector<double>& local_waypoints_y);
 
+  tk::spline curve_fit(const std::vector<double>& local_waypoints_x,
+                const std::vector<double>& local_waypoints_y);
 
 
 };
