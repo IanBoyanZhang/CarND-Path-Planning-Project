@@ -217,76 +217,103 @@ int main() {
           // j[1] is the data JSON object
 
         	// Main car's localization Data
-          	double car_x = j[1]["x"];
-          	double car_y = j[1]["y"];
-          	double car_s = j[1]["s"];
-          	double car_d = j[1]["d"];
-          	double car_yaw = j[1]["yaw"];
-          	double car_speed = j[1]["speed"];
+					double car_x = j[1]["x"];
+					double car_y = j[1]["y"];
+					double car_s = j[1]["s"];
+					double car_d = j[1]["d"];
+					double car_yaw = j[1]["yaw"];
+					double car_speed = j[1]["speed"];
 
-          	// Previous path data given to the Planner
-          	auto previous_path_x = j[1]["previous_path_x"];
-          	auto previous_path_y = j[1]["previous_path_y"];
-          	// Previous path's end s and d values 
-          	double end_path_s = j[1]["end_path_s"];
-          	double end_path_d = j[1]["end_path_d"];
+					// Previous path data given to the Planner
+					auto previous_path_x = j[1]["previous_path_x"];
+					auto previous_path_y = j[1]["previous_path_y"];
+					// Previous path's end s and d values
+					double end_path_s = j[1]["end_path_s"];
+					double end_path_d = j[1]["end_path_d"];
 
-          	// Sensor Fusion Data, a list of all other cars on the same side of the road.
-          	auto sensor_fusion = j[1]["sensor_fusion"];
+					// Sensor Fusion Data, a list of all other cars on the same side of the road.
+					auto sensor_fusion = j[1]["sensor_fusion"];
 
-          	json msgJson;
+					json msgJson;
 
-          	vector<double> next_x_vals;
-          	vector<double> next_y_vals;
+					vector<double> next_x_vals;
+					vector<double> next_y_vals;
 
 
-          	// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-						// TODO: strategy fitting in local coordinates
-						// Going cycles
+					// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
+					// TODO: strategy fitting in local coordinates
 
-						/*double pos_x;
-						double pos_y;
-						double angle;
-						int path_size = previous_path_x.size();
+					// Init condition
+					double pos_x;
+					double pos_y;
+					double angle;
 
-						for(int i = 0; i < path_size; i++)
-						{
-							next_x_vals.push_back(previous_path_x[i]);
-							next_y_vals.push_back(previous_path_y[i]);
-						}
+					int path_size = previous_path_x.size();
 
-						if(path_size == 0)
-						{
-							pos_x = car_x;
-							pos_y = car_y;
-							angle = deg2rad(car_yaw);
-						}
-						else
-						{
-							pos_x = previous_path_x[path_size-1];
-							pos_y = previous_path_y[path_size-1];
+					for(int i = 0; i < path_size; i+=1) {
+						next_x_vals.push_back(previous_path_x[i]);
+						next_y_vals.push_back(previous_path_y[i]);
+					}
 
-							double pos_x2 = previous_path_x[path_size-2];
-							double pos_y2 = previous_path_y[path_size-2];
-							angle = atan2(pos_y-pos_y2,pos_x-pos_x2);
-						}
+					if(path_size == 0) {
+						pos_x = car_x;
+						pos_y = car_y;
+						angle = deg2rad(car_yaw);
+					} else {
+						pos_x = previous_path_x[path_size - 1];
+						pos_y = previous_path_y[path_size - 1];
 
-						double dist_inc = 0.5;
-						for(int i = 0; i < 50-path_size; i++)
-						{
-							next_x_vals.push_back(pos_x+(dist_inc)*cos(angle+(i+1)*(pi()/100)));
-							next_y_vals.push_back(pos_y+(dist_inc)*sin(angle+(i+1)*(pi()/100)));
-							pos_x += (dist_inc)*cos(angle+(i+1)*(pi()/100));
-							pos_y += (dist_inc)*sin(angle+(i+1)*(pi()/100));
-						}*/
+						double pos_x2 = previous_path_x[path_size - 2];
+						double pos_y2 = previous_path_y[path_size - 2];
+						angle = atan2(pos_y - pos_y2, pos_x - pos_x2);
+					}
 
-          	msgJson["next_x"] = next_x_vals;
-          	msgJson["next_y"] = next_y_vals;
+					// Predict with dynamics or not?
+					int next_wp_id = NextWaypoint(car_x, car_y, angle, map_waypoints_x, map_waypoints_y);
+					vector<double> next_wps_x;
+					vector<double> next_wps_y;
+					// Take next LEN waypoints to generate proposed ways
+					// TODO: factor below into functions
+					// TODO: 1. fit in frenet coordinates
+					// TODO: 2. fit in global coordinates
+					// Sample coordinate transform
+					vector<double> frenet_next_wps_s;
+					vector<double> frenet_next_wps_d;
 
-          	auto msg = "42[\"control\","+ msgJson.dump()+"]";
+					const int LEN = 1;
+					int mid_d = 2 + 4;
+					for (auto i = 0; i < LEN; i+=1) {
+						next_wp_id += i;
+						// Do the coordinate transform
+						frenet_next_wps_s.push_back(map_waypoints_s[next_wp_id]);
+						// Debug only for now, only driving in middle lane
+						frenet_next_wps_d.push_back(2 + 4);
+					}
 
-          	//this_thread::sleep_for(chrono::milliseconds(1000));
-          	ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
+//					tk::spline s;
+//					s.set_points(frenet_next_wps_s, frenet_next_wps_d);
+
+					int num_of_steps = 50 - path_size;
+					double s_diff = (frenet_next_wps_s[LEN - 1] - car_s)/num_of_steps;
+					vector<double> container;
+          int mp_x;
+					int mp_y;
+
+					for (int i = 0; i < 50 - path_size; i+=1) {
+						// s(i) takes the fitted spline value
+						// container = getXY(s(i), mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+						container = getXY(car_s + s_diff * i, mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+            next_x_vals.push_back(container[0]);
+						next_y_vals.push_back(container[1]);
+					}
+
+					msgJson["next_x"] = next_x_vals;
+					msgJson["next_y"] = next_y_vals;
+
+					auto msg = "42[\"control\","+ msgJson.dump()+"]";
+
+					//this_thread::sleep_for(chrono::milliseconds(1000));
+					ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
           
         }
       } else {
