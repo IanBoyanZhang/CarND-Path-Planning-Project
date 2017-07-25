@@ -248,6 +248,8 @@ int main() {
 					double pos_y;
 					double angle;
 
+					double pos_s;
+
 					int path_size = previous_path_x.size();
 
 					for(int i = 0; i < path_size; i+=1) {
@@ -259,6 +261,7 @@ int main() {
 						pos_x = car_x;
 						pos_y = car_y;
 						angle = deg2rad(car_yaw);
+            pos_s = car_s;
 					} else {
 						pos_x = previous_path_x[path_size - 1];
 						pos_y = previous_path_y[path_size - 1];
@@ -266,6 +269,7 @@ int main() {
 						double pos_x2 = previous_path_x[path_size - 2];
 						double pos_y2 = previous_path_y[path_size - 2];
 						angle = atan2(pos_y - pos_y2, pos_x - pos_x2);
+						pos_s = end_path_s;
 					}
 
 					// Predict with dynamics or not?
@@ -280,21 +284,21 @@ int main() {
 					vector<double> frenet_next_wps_s;
 					vector<double> frenet_next_wps_d;
 
-					const int LEN = 1;
-					int mid_d = 2 + 4;
+					const int LEN = 6;
+					int mid_d = 2 + 4 + 4 + 4;
 					for (auto i = 0; i < LEN; i+=1) {
 						next_wp_id += i;
 						// Do the coordinate transform
 						frenet_next_wps_s.push_back(map_waypoints_s[next_wp_id]);
 						// Debug only for now, only driving in middle lane
-						frenet_next_wps_d.push_back(2 + 4);
+						frenet_next_wps_d.push_back(2 + 4 + 4 + 4);
 					}
 
-//					tk::spline s;
-//					s.set_points(frenet_next_wps_s, frenet_next_wps_d);
+					tk::spline s;
+					s.set_points(frenet_next_wps_s, frenet_next_wps_d);
 
 					int num_of_steps = 50 - path_size;
-					double s_diff = (frenet_next_wps_s[LEN - 1] - car_s)/num_of_steps;
+					double s_diff = (frenet_next_wps_s[0] - pos_s)/num_of_steps;
 					vector<double> container;
           int mp_x;
 					int mp_y;
@@ -302,10 +306,13 @@ int main() {
 					for (int i = 0; i < 50 - path_size; i+=1) {
 						// s(i) takes the fitted spline value
 						// container = getXY(s(i), mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-						container = getXY(car_s + s_diff * i, mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+						//container = getXY(pos_s + s_diff * i, mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
+						container = getXY(pos_s + s_diff * i, s(pos_s + s_diff * i), map_waypoints_s, map_waypoints_x, map_waypoints_y);
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}
+
+					// smooth again
 
 					msgJson["next_x"] = next_x_vals;
 					msgJson["next_y"] = next_y_vals;
