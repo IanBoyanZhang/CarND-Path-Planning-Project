@@ -268,7 +268,9 @@ int main() {
 
 						double pos_x2 = previous_path_x[path_size - 2];
 						double pos_y2 = previous_path_y[path_size - 2];
+            // Which one is right?
 						angle = atan2(pos_y - pos_y2, pos_x - pos_x2);
+						// angle = deg2rad(car_yaw);
 						pos_s = end_path_s;
 					}
 
@@ -297,7 +299,7 @@ int main() {
 					tk::spline s;
 					s.set_points(frenet_next_wps_s, frenet_next_wps_d);
 
-					int num_of_steps = 50 - path_size;
+					int num_of_steps = 60 - path_size;
 					double s_diff = (frenet_next_wps_s[0] - pos_s)/num_of_steps;
 					vector<double> container;
           int mp_x;
@@ -313,6 +315,13 @@ int main() {
 					}
 
 					// smooth again
+					// Can I use same spline?
+          /*tk::spline s2;
+					s2.set_points(next_x_vals, next_y_vals);
+          for (int i = 0; i < 50; i+=1) {
+						next_x_vals[i] = next_x_vals[i];
+						next_y_vals[i] = s2(next_x_vals[i]);
+					}*/
 
 					msgJson["next_x"] = next_x_vals;
 					msgJson["next_y"] = next_y_vals;
