@@ -6,7 +6,11 @@
 #define PATH_PLANNING_UTILS_H
 
 #include <vector>
+#include <cmath>
 #include "spline.h"
+#include "constants.h"
+
+using namespace std;
 
 /**
  * Lane center d magnitude in simulator
@@ -20,17 +24,15 @@ const uint8_t LANE3 = 2 + 4 + 4;
 class utils {
 
 public:
-  void globalCart2local(const double& car_x, const double& car_y,
-                        const std::vector<double>& map_waypoints_x,
-                        const std::vector<double>& map_waypoints_y,
-                        std::vector<double>& local_waypoints_x,
-                        std::vector<double>& local_waypoints_y);
-
-  // Cubic Spline interpolation
-  tk::spline curve_fit(const std::vector<double>& local_waypoints_x,
-                const std::vector<double>& local_waypoints_y);
-
-
+  double logistic(double x);
+  double eval_equation(double t, s_t coefficients);
+  std::vector<double> differentiate(s_t cofficients);
+//  double nearest_approach_to_any_vehicle();
+  double get_f_and_N_derivatives(s_t coeffs, int N);
+  // Serializer
+  vector<double> s_t_to_vec(s_t s_state);
+  vector<double> d_t_to_vec(d_t d_state);
+  vector<double> combine_states(s_t s_state, d_t d_state);
 };
 
 
