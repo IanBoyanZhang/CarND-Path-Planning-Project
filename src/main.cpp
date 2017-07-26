@@ -286,7 +286,7 @@ int main() {
 					vector<double> frenet_next_wps_s;
 					vector<double> frenet_next_wps_d;
 
-					const int LEN = 6;
+					const int LEN = 10;
 					int mid_d = 2 + 4 + 4 + 4;
 					for (auto i = 0; i < LEN; i+=1) {
 						next_wp_id += i;

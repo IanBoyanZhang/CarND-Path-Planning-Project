@@ -6,16 +6,25 @@
 #define PATH_PLANNING_VEHICLE_H
 
 #include <cmath>
+#include <vector>
 #include "constants.h"
+
+using namespace std;
 
 class Vehicle {
 public:
   Vehicle(state_t& start);
 
+  Vehicle(vector<double> start);
+
   state_t state_in(double t);
+
+  vector<double> state_in_vec(double t);
 
 private:
   state_t _start_state;
+
+  vector<double> _start_state_vec;
 
   s_t _state_to_s_state();
 

@@ -5,7 +5,10 @@
 #ifndef PATH_PLANNING_PTG_H
 #define PATH_PLANNING_PTG_H
 
-//#include "constants.h"
+#include "constants.h"
+#include <vector>
+#include <map>
+#include "Vehicle.h"
 /*
     Finds the best trajectory according to WEIGHTED_COST_FUNCTIONS (global).
 
@@ -35,8 +38,13 @@
      best_d gives coefficients for d(t) and best_t gives duration associated w/
      this trajectory.
  */
+
+using namespace std;
 class PTG {
-  
+public:
+  PTG(vector<double>start_s, vector<double>start_d,
+      int target_vehile, vector<double>delta, int T, map<int, Vehicle>);
+  //run();
 };
 
 

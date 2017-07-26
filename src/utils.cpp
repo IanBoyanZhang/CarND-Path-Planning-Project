@@ -15,27 +15,16 @@ double utils::logistic(double x) {
 }
 
 /**
- * Evaluate a polynomial
- * @param t
- * @param coefficients
- * @return
- */
-// TODO: using lambda expression
-// TODO: serializer
-double utils::eval_equation(double t, s_t coefficients) {
-  // How about using
-  return coefficients.s + coefficients.s_dot * pow(t, 1) + coefficients.s_ddot * pow(t, 2);
-}
-/**
  Calculates the derivative of a polynomial and returns
  the corresponding coefficients.
  * @param coefficients
  * @return
  */
-vector<double> utils::differentiate(s_t coefficients) {
+vector<double> utils::differentiate(const vector<double>& coefficients) {
   vector<double> new_cos;
-  new_cos.push_back(coefficients.s_dot * 2);
-  new_cos.push_back(coefficients.s_ddot * 3);
+  for (auto i = 1; i < coefficients.size(); i+=1) {
+    new_cos.push_back(coefficients[i] * (i + 1));
+  }
   return new_cos;
 }
 
@@ -67,3 +56,37 @@ vector<double> utils::combine_states(s_t s_state, d_t d_state){
   return s_vec;
 }
 
+function<double(double)> utils::to_equation(const vector<double>& coefficients) {
+  function<double(double)> f = [&coefficients](double t)-> double {
+    double total = 0.0;
+    for (auto i = 0; i < coefficients.size(); i+=1) {
+      total += coefficients[i] * pow(t, i);
+    }
+    return total;
+  };
+  return f;
+}
+
+/**
+ * Calculates the closest distance to any vehicle during a trajectory.
+ * @param traj
+ * @param vehicles
+ * @return
+ */
+double utils::nearest_appraoch(vector<double> traj, vector<Vehicle> vehicles) {
+  // Not implemented
+  return 0;
+}
+
+vector<function<double(double)> >
+utils::get_f_and_N_derivatitves(const vector<double>& coeffs) {
+  vector<function<double(double)> > functions;
+  functions.push_back(to_equation(coeffs));
+  int N = 3;
+  vector<double> deri_coeffs = coeffs;
+  for (auto i = 0; i < N; i+=1) {
+    deri_coeffs = differentiate(deri_coeffs);
+    functions.push_back(to_equation(deri_coeffs));
+  }
+  return functions;
+}

@@ -5,6 +5,7 @@
 #ifndef PATH_PLANNING_CONSTANTS_H
 #define PATH_PLANNING_CONSTANTS_H
 
+#include <vector>
 struct weighted_cost_func_t{
   double time_diff_cost = 1;
   double s_diff_cost = 1;
@@ -42,5 +43,13 @@ struct state_t{
   double d;
   double d_dot;
   double d_ddot;
+};
+
+
+// TODO: design a better data structure for storing trajectory values
+struct ptg_t {
+  std::vector<double> s;
+  std::vector<double> d;
+  double t;
 };
 #endif //PATH_PLANNING_CONSTANTS_H
