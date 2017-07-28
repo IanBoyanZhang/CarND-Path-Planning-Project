@@ -160,6 +160,50 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 
 }
 
+// Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
+vector<tk::spline> fitXY(double s, double d, vector<double> maps_s,
+										 vector<double> maps_x, vector<double> maps_y,
+										 vector<double> maps_dx, vector<double> maps_dy) {
+	int prev_wp = -1;
+
+	while (s > maps_s[prev_wp + 1] && (prev_wp < (int) (maps_s.size() - 1)))
+	{
+		prev_wp++;
+	}
+
+	vector<double> wp_s;
+  vector<double> wp_x;
+	vector<double> wp_y;
+	vector<double> wp_dx;
+	vector<double> wp_dy;
+	int wp_id;
+
+	for (auto i = 0, len = 15; i < len; i+=1) {
+		wp_id = (prev_wp + i)%maps_x.size();
+		wp_s.push_back(maps_s[wp_id]);
+		wp_x.push_back(maps_x[wp_id]);
+		wp_y.push_back(maps_y[wp_id]);
+		wp_dx.push_back(maps_dx[wp_id]);
+		wp_dy.push_back(maps_dy[wp_id]);
+	}
+	tk::spline wp_sp_x;
+	tk::spline wp_sp_y;
+	tk::spline wp_sp_dx;
+	tk::spline wp_sp_dy;
+	wp_sp_x.set_points(wp_s, wp_x);
+	wp_sp_y.set_points(wp_s, wp_y);
+  wp_sp_dx.set_points(wp_s, wp_dx);
+	wp_sp_dy.set_points(wp_s, wp_dy);
+
+	return {wp_sp_x, wp_sp_y, wp_sp_dx, wp_sp_dy};
+}
+
+//void getXY(vector<double> wp_s,
+//					 tk::spline wp_sp_x, tk::spline wp_sp_y,
+//					 tk::spline wp_dx, tk::spline wp_dy) {
+//
+//}
+
 int main() {
   uWS::Hub h;
 
@@ -304,6 +348,9 @@ int main() {
 					vector<double> container;
           int mp_x;
 					int mp_y;
+
+					// TODO: Insteading using getXY using your own
+					// spline interpolation for reverting back to X, Y coordinates
 
 					for (int i = 0; i < 50 - path_size; i+=1) {
 						// s(i) takes the fitted spline value
