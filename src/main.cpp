@@ -300,9 +300,6 @@ int main() {
 					vector<double> next_x_vals;
 					vector<double> next_y_vals;
 
-					// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
-					// TODO: strategy fitting in local coordinates
-					// TODO: time difference measurement
 					if (!initialized) {
 						auto dt = 0;
             t_begin = chrono::high_resolution_clock::now();
