@@ -360,10 +360,9 @@ int main() {
 					s.set_points(frenet_next_wps_s, frenet_next_wps_d);
 
 					int num_of_steps = 60 - path_size;
-					double s_diff = (frenet_next_wps_s[0] - pos_s)/num_of_steps;
+//					double s_diff = (frenet_next_wps_s[0] - pos_s)/num_of_steps;
+          double s_diff = 0.3;
 					vector<double> container;
-          int mp_x;
-					int mp_y;
 
 					// TODO: Insteading using getXY using your own
 					// spline interpolation for reverting back to X, Y coordinates
