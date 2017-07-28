@@ -161,9 +161,9 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 }
 
 // Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
-vector<tk::spline> fitXY(double s, double d, vector<double> maps_s,
-										 vector<double> maps_x, vector<double> maps_y,
-										 vector<double> maps_dx, vector<double> maps_dy) {
+vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
+										 const vector<double> maps_x, const vector<double> maps_y,
+										 const vector<double> maps_dx, const vector<double> maps_dy) {
 	int prev_wp = -1;
 
 	while (s > maps_s[prev_wp + 1] && (prev_wp < (int) (maps_s.size() - 1)))
@@ -178,7 +178,8 @@ vector<tk::spline> fitXY(double s, double d, vector<double> maps_s,
 	vector<double> wp_dy;
 	int wp_id;
 
-	for (auto i = 0, len = 15; i < len; i+=1) {
+	//for (int i = 0, len = 15; i < len; i+=1) {
+	for (int i = 0, len = 15; i < len; i+=1) {
 		wp_id = (prev_wp + i)%maps_x.size();
 		wp_s.push_back(maps_s[wp_id]);
 		wp_x.push_back(maps_x[wp_id]);
@@ -198,8 +199,7 @@ vector<tk::spline> fitXY(double s, double d, vector<double> maps_s,
 	return {wp_sp_x, wp_sp_y, wp_sp_dx, wp_sp_dy};
 }
 
-vector<double> getTargetXY(const double pos_s, const int lane,
-															const vector<double> wp_s, const vector<tk::spline> wp_sp) {
+vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::spline> wp_sp) {
 	const int LANE_WIDTH = 4;
 	tk::spline wp_sp_x = wp_sp[0];
 	tk::spline wp_sp_y = wp_sp[1];
@@ -300,11 +300,8 @@ int main() {
 					vector<double> next_x_vals;
 					vector<double> next_y_vals;
 
-
 					// TODO: define a path made up of (x,y) points that the car will visit sequentially every .02 seconds
 					// TODO: strategy fitting in local coordinates
-
-
 					// TODO: time difference measurement
 					if (!initialized) {
 						auto dt = 0;
@@ -322,7 +319,6 @@ int main() {
 					double pos_x;
 					double pos_y;
 					double angle;
-
 					double pos_s;
 
 					int path_size = previous_path_x.size();
@@ -346,47 +342,20 @@ int main() {
             // Which one is right?
 						angle = atan2(pos_y - pos_y2, pos_x - pos_x2);
 						// angle = deg2rad(car_yaw);
-						pos_s = end_path_s;
+            pos_s = end_path_s;
 					}
 
 					// Predict with dynamics or not?
-					int next_wp_id = NextWaypoint(car_x, car_y, angle, map_waypoints_x, map_waypoints_y);
-					vector<double> next_wps_x;
-					vector<double> next_wps_y;
-					// Take next LEN waypoints to generate proposed ways
-					// TODO: factor below into functions
-					// TODO: 1. fit in frenet coordinates
-					// TODO: 2. fit in global coordinates
 					// Sample coordinate transform
-					vector<double> frenet_next_wps_s;
-					vector<double> frenet_next_wps_d;
-
-					const int LEN = 10;
-					int mid_d = 2 + 4 + 4 + 4;
-					for (auto i = 0; i < LEN; i+=1) {
-						next_wp_id += i;
-						// Do the coordinate transform
-						frenet_next_wps_s.push_back(map_waypoints_s[next_wp_id]);
-						// Debug only for now, only driving in middle lane
-						frenet_next_wps_d.push_back(2 + 4 + 4 + 4);
-					}
-
-					tk::spline s;
-					s.set_points(frenet_next_wps_s, frenet_next_wps_d);
-
-					int num_of_steps = 60 - path_size;
-//					double s_diff = (frenet_next_wps_s[0] - pos_s)/num_of_steps;
           double s_diff = 0.3;
 					vector<double> container;
 
-					// TODO: Instead of using getXY using your own
-					// spline interpolation for reverting back to X, Y coordinates
-
-					for (int i = 0; i < 50 - path_size; i+=1) {
-						// s(i) takes the fitted spline value
-						// container = getXY(s(i), mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-						//container = getXY(pos_s + s_diff * i, mid_d, map_waypoints_s, map_waypoints_x, map_waypoints_y);
-						container = getXY(pos_s + s_diff * i, s(pos_s + s_diff * i), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+					vector<tk::spline> wp_sp;
+          wp_sp = fitXY(pos_s, map_waypoints_s,
+											 map_waypoints_x, map_waypoints_y,
+											 map_waypoints_dx, map_waypoints_dy);
+					for (int i = 0; i < 100 - path_size; i+=1) {
+						container = getTargetXY(pos_s + s_diff * i, 3, wp_sp);
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}
