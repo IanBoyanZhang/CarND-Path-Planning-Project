@@ -198,11 +198,26 @@ vector<tk::spline> fitXY(double s, double d, vector<double> maps_s,
 	return {wp_sp_x, wp_sp_y, wp_sp_dx, wp_sp_dy};
 }
 
-//void getXY(vector<double> wp_s,
-//					 tk::spline wp_sp_x, tk::spline wp_sp_y,
-//					 tk::spline wp_dx, tk::spline wp_dy) {
-//
-//}
+vector<double> getTargetXY(const double pos_s, const int lane,
+															const vector<double> wp_s, const vector<tk::spline> wp_sp) {
+	const int LANE_WIDTH = 4;
+	tk::spline wp_sp_x = wp_sp[0];
+	tk::spline wp_sp_y = wp_sp[1];
+	tk::spline wp_sp_dx = wp_sp[2];
+	tk::spline wp_sp_dy = wp_sp[3];
+
+	double x = wp_sp_x(pos_s);
+	double y = wp_sp_y(pos_s);
+	double dx = wp_sp_dx(pos_s);
+	double dy = wp_sp_dy(pos_s);
+
+	/**
+	 * lane = 0, 1, 2
+	 */
+	const int d = 2 + lane * 4;
+
+	return {x + d * dx, y + d * dy};
+}
 
 int main() {
   uWS::Hub h;
@@ -364,7 +379,7 @@ int main() {
           double s_diff = 0.3;
 					vector<double> container;
 
-					// TODO: Insteading using getXY using your own
+					// TODO: Instead of using getXY using your own
 					// spline interpolation for reverting back to X, Y coordinates
 
 					for (int i = 0; i < 50 - path_size; i+=1) {
@@ -375,15 +390,6 @@ int main() {
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}
-
-					// smooth again
-					// Can I use same spline?
-          /*tk::spline s2;
-					s2.set_points(next_x_vals, next_y_vals);
-          for (int i = 0; i < 50; i+=1) {
-						next_x_vals[i] = next_x_vals[i];
-						next_y_vals[i] = s2(next_x_vals[i]);
-					}*/
 
 					msgJson["next_x"] = next_x_vals;
 					msgJson["next_y"] = next_y_vals;
