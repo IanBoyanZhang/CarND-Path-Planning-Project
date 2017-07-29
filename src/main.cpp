@@ -178,14 +178,21 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	vector<double> wp_dy;
 	int wp_id;
 
-	//for (int i = 0, len = 15; i < len; i+=1) {
 	for (int i = 0, len = 15; i < len; i+=1) {
+	//for (int i = 0, len = 7; i < len; i+=1) {
 		wp_id = (prev_wp + i)%maps_x.size();
+
+    // TODO: To deal with track wrap around
+		if (prev_wp + len >= maps_x.size()) {
+
+		}
+
 		wp_s.push_back(maps_s[wp_id]);
 		wp_x.push_back(maps_x[wp_id]);
 		wp_y.push_back(maps_y[wp_id]);
-		wp_dx.push_back(maps_dx[wp_id]);
-		wp_dy.push_back(maps_dy[wp_id]);
+		// For better numerically stablity
+		wp_dx.push_back(maps_dx[wp_id] * 1000);
+		wp_dy.push_back(maps_dy[wp_id] * 1000);
 	}
 	tk::spline wp_sp_x;
 	tk::spline wp_sp_y;
@@ -216,7 +223,11 @@ vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::
 	 */
 	const int d = 2 + lane * 4;
 
-	return {x + d * dx, y + d * dy};
+	return {x + d * dx/1000, y + d * dy/1000};
+}
+
+void upsample() {
+
 }
 
 int main() {
@@ -309,7 +320,7 @@ int main() {
 						// cast to ns
 						auto dt = chrono::duration_cast<std::chrono::milliseconds>(end - t_begin).count();
 						t_begin = end;
-						cout << "time difference: " << dt << endl;
+						// cout << "time difference: " << dt << endl;
 					}
 
 					// Init condition
@@ -320,7 +331,9 @@ int main() {
 
 					int path_size = previous_path_x.size();
 
-					for(int i = 0; i < path_size; i+=1) {
+          int start_iter = 15;
+
+					for(int i = start_iter; i < path_size; i+=1) {
 						next_x_vals.push_back(previous_path_x[i]);
 						next_y_vals.push_back(previous_path_y[i]);
 					}
@@ -344,18 +357,30 @@ int main() {
 
 					// Predict with dynamics or not?
 					// Sample coordinate transform
-          double s_diff = 0.3;
+          double s_diff = 0.2;
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
-          wp_sp = fitXY(pos_s, map_waypoints_s,
-											 map_waypoints_x, map_waypoints_y,
-											 map_waypoints_dx, map_waypoints_dy);
-					for (int i = 0; i < 100 - path_size; i+=1) {
-						container = getTargetXY(pos_s + s_diff * i, 3, wp_sp);
+
+					cout << "pos_s" << pos_s << endl;
+
+					wp_sp = fitXY(pos_s, map_waypoints_s,
+												map_waypoints_x, map_waypoints_y,
+												map_waypoints_dx, map_waypoints_dy);
+
+					for (int i = 0; i < 200 - path_size; i+=1) {
+						container = getTargetXY(pos_s + s_diff * i, 1, wp_sp);
+						// TODO: upsampling current steps to include further predictions
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}
+
+          cout << "path size: " << path_size << endl;
+					// TODO: second filtering for stitching the path?
+
+					tk::spline prev_sp;
+					vector<double> prev_s;
+					double temp_s;
 
 					msgJson["next_x"] = next_x_vals;
 					msgJson["next_y"] = next_y_vals;

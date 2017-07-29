@@ -6,9 +6,11 @@
 #define PATH_PLANNING_PTG_H
 
 #include "constants.h"
+#include "Eigen-3.3/Eigen/Dense"
 #include <vector>
 #include <map>
 #include "Vehicle.h"
+#include "Eigen-3.3/Eigen/src/Core/Matrix.h"
 /*
     Finds the best trajectory according to WEIGHTED_COST_FUNCTIONS (global).
 
@@ -40,11 +42,16 @@
  */
 
 using namespace std;
+using Eigen::VectorXd;
+using Eigen::MatrixXd;
+
 class PTG {
 public:
+  PTG();
   PTG(vector<double>start_s, vector<double>start_d,
       int target_vehile, vector<double>delta, int T, map<int, Vehicle>);
   //run();
+  vector<double> JMT(vector<double> start, vector<double> end, double T);
 };
 
 
