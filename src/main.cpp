@@ -163,7 +163,8 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 // Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
 vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 										 const vector<double> maps_x, const vector<double> maps_y,
-										 const vector<double> maps_dx, const vector<double> maps_dy) {
+										 const vector<double> maps_dx, const vector<double> maps_dy,
+											const double max_s) {
 	int prev_wp = -1;
 
 	while (s > maps_s[prev_wp + 1] && (prev_wp < (int) (maps_s.size() - 1)))
@@ -178,16 +179,16 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	vector<double> wp_dy;
 	int wp_id;
 
-	for (int i = 0, len = 15; i < len; i+=1) {
+	int back_track_id = -6;
+	for (int i = back_track_id, len = 6; i < 10; i+=1) {
 	//for (int i = 0, len = 7; i < len; i+=1) {
 		wp_id = (prev_wp + i)%maps_x.size();
 
-    // TODO: To deal with track wrap around
-		if (prev_wp + len >= maps_x.size()) {
+		double map_s_val;
+		// Sort?
+    // Dealing with track wrap around
 
-		}
-
-		wp_s.push_back(maps_s[wp_id]);
+		wp_s.push_back(map_s_val);
 		wp_x.push_back(maps_x[wp_id]);
 		wp_y.push_back(maps_y[wp_id]);
 		// For better numerically stablity
@@ -269,7 +270,8 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  h.onMessage([&initialized, &t_begin, &map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+  h.onMessage([&max_s, &initialized, &t_begin,
+											&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
@@ -331,11 +333,19 @@ int main() {
 
 					int path_size = previous_path_x.size();
 
-          int start_iter = 15;
+          int start_iter = 5;
 
 					for(int i = start_iter; i < path_size; i+=1) {
 						next_x_vals.push_back(previous_path_x[i]);
 						next_y_vals.push_back(previous_path_y[i]);
+					}
+
+					for (int i = 0; i < path_size; i+=1) {
+						cout << "prev_x: " << previous_path_x[i] << endl;
+            cout << "prev_y: " << previous_path_y[i] << endl;
+
+						/*cout << "prev_s" << getXY(previous_path_x[i], previous_path_y[i],
+									map_waypoints_s, map_waypoints_x, map_waypoints_y)[0] << endl;*/
 					}
 
 					if(path_size == 0) {
@@ -357,25 +367,29 @@ int main() {
 
 					// Predict with dynamics or not?
 					// Sample coordinate transform
-          double s_diff = 0.2;
+          double s_diff = 0.5;
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
 
 					cout << "pos_s" << pos_s << endl;
+					cout << "pos_x" << pos_x << endl;
+					cout << "pos_y" << pos_y << endl;
 
 					wp_sp = fitXY(pos_s, map_waypoints_s,
 												map_waypoints_x, map_waypoints_y,
-												map_waypoints_dx, map_waypoints_dy);
+												map_waypoints_dx, map_waypoints_dy,
+												max_s);
 
 					for (int i = 0; i < 200 - path_size; i+=1) {
-						container = getTargetXY(pos_s + s_diff * i, 1, wp_sp);
+						container = getTargetXY(pos_s + s_diff * i, 3, wp_sp);
 						// TODO: upsampling current steps to include further predictions
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}
 
           cout << "path size: " << path_size << endl;
+          cout << "end of packets <<<<<<<<<< " << endl;
 					// TODO: second filtering for stitching the path?
 
 					tk::spline prev_sp;
