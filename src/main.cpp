@@ -132,6 +132,43 @@ vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x
 
 }
 
+/**
+ *
+ * @tparam T
+ * @tparam Compare
+ * @param vec
+ * @param compare
+ * @return
+ */
+template <typename T, typename Compare>
+std::vector<std::size_t> sort_permutation(
+				const std::vector<T>& vec,
+				Compare compare)
+{
+	std::vector<std::size_t> p(vec.size());
+	std::iota(p.begin(), p.end(), 0);
+	std::sort(p.begin(), p.end(),
+						[&](std::size_t i, std::size_t j){ return compare(vec[i], vec[j]); });
+	return p;
+}
+
+/**
+ * @tparam T
+ * @param vec
+ * @param p
+ * @return
+ */
+template <typename T>
+std::vector<T> apply_permutation(
+				const std::vector<T>& vec,
+				const std::vector<std::size_t>& p)
+{
+	std::vector<T> sorted_vec(vec.size());
+	std::transform(p.begin(), p.end(), sorted_vec.begin(),
+								 [&](std::size_t i){ return vec[i]; });
+	return sorted_vec;
+}
+
 // Transform from Frenet s,d coordinates to Cartesian x,y
 vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> maps_x, vector<double> maps_y)
 {
@@ -180,21 +217,30 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	int wp_id;
 
 	int back_track_id = -6;
-	for (int i = back_track_id, len = 6; i < 10; i+=1) {
+	for (int i = back_track_id; i < 10; i+=1) {
 	//for (int i = 0, len = 7; i < len; i+=1) {
 		wp_id = (prev_wp + i)%maps_x.size();
 
-		double map_s_val;
-		// Sort?
-    // Dealing with track wrap around
-
-		wp_s.push_back(map_s_val);
+		wp_s.push_back(maps_s[wp_id]);
 		wp_x.push_back(maps_x[wp_id]);
 		wp_y.push_back(maps_y[wp_id]);
-		// For better numerically stablity
-		wp_dx.push_back(maps_dx[wp_id] * 1000);
-		wp_dy.push_back(maps_dy[wp_id] * 1000);
+		// For better numerically stability
+		wp_dx.push_back(maps_dx[wp_id] );
+		//wp_dx.push_back(maps_dx[wp_id] * 1000);
+		wp_dy.push_back(maps_dy[wp_id] );
+		//wp_dy.push_back(maps_dy[wp_id] * 1000);
 	}
+
+	// Sort for dealing with track wrap around
+	// TODO: smooth transition using relative distance
+  auto p = sort_permutation(wp_s, less<double>());
+
+	wp_s = apply_permutation(wp_s, p);
+  wp_x = apply_permutation(wp_x, p);
+  wp_y = apply_permutation(wp_y, p);
+	wp_dx = apply_permutation(wp_dx, p);
+	wp_dy = apply_permutation(wp_dy, p);
+
 	tk::spline wp_sp_x;
 	tk::spline wp_sp_y;
 	tk::spline wp_sp_dx;
@@ -222,12 +268,19 @@ vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::
 	/**
 	 * lane = 0, 1, 2
 	 */
-	const int d = 2 + lane * 4;
+	//const int d = 2 + lane * 4;
+	const int d = 0;
 
+	//return {x + d * dx/1000, y + d * dy/1000};
 	return {x + d * dx/1000, y + d * dy/1000};
 }
+template <typename T>
+T l2dist(vector<double> A, vector<double> B) {
+	return sqrt(pow((A[0] - B[0]), 2) + pow((A[1], B[1]), 2));
+}
 
-void upsample() {
+template <typename T>
+void isLarger(vector<double> current, vector<double> prev) {
 
 }
 
@@ -333,19 +386,9 @@ int main() {
 
 					int path_size = previous_path_x.size();
 
-          int start_iter = 5;
-
-					for(int i = start_iter; i < path_size; i+=1) {
-						next_x_vals.push_back(previous_path_x[i]);
-						next_y_vals.push_back(previous_path_y[i]);
-					}
-
 					for (int i = 0; i < path_size; i+=1) {
 						cout << "prev_x: " << previous_path_x[i] << endl;
-            cout << "prev_y: " << previous_path_y[i] << endl;
-
-						/*cout << "prev_s" << getXY(previous_path_x[i], previous_path_y[i],
-									map_waypoints_s, map_waypoints_x, map_waypoints_y)[0] << endl;*/
+						cout << "prev_y: " << previous_path_y[i] << endl;
 					}
 
 					if(path_size == 0) {
@@ -363,11 +406,13 @@ int main() {
 						angle = atan2(pos_y - pos_y2, pos_x - pos_x2);
 						// angle = deg2rad(car_yaw);
             pos_s = end_path_s;
+//						pos_s = getFrenet(pos_x, pos_y, angle,
+//															map_waypoints_x, map_waypoints_y);
 					}
 
 					// Predict with dynamics or not?
 					// Sample coordinate transform
-          double s_diff = 0.5;
+          double s_diff = 0.3;
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
@@ -381,9 +426,15 @@ int main() {
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
 
-					for (int i = 0; i < 200 - path_size; i+=1) {
+					for(int i = 0; i < path_size; i+=1) {
+						next_x_vals.push_back(previous_path_x[i]);
+						next_y_vals.push_back(previous_path_y[i]);
+					}
+
+					for (int i = 0; i < 50 - path_size; i+=1) {
 						container = getTargetXY(pos_s + s_diff * i, 3, wp_sp);
 						// TODO: upsampling current steps to include further predictions
+						// TODO: filtering the packets using euclidean distance
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}
