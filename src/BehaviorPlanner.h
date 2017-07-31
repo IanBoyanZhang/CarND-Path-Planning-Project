@@ -22,8 +22,7 @@ public:
   void setCostCoeffs(planner_cost_t plannerCost);
   void updateSensorReading(const vector<vector<double> > sensor_fusion);
   vector<vector<double> > getTargetFrenetVelocity();
-  // TODO: predict
-  void predict();
+  vector<vector<double> > predict(vehicle_t ego, double t);
 
 private:
   vector< vector< double> > _sensor_fusion;
@@ -34,7 +33,11 @@ private:
 
   planner_cost_t _plannerCost;
   // Cost functions
-  double _distance_from_goal_lane(vehicle_t ego, ptg_t trajectory, int lane);
+  double _distance_from_goal_lane(vehicle_t ego, int lane);
+  double _inefficiency_cost(vehicle_t ego, double target_speed);
+  double _collision_cost(vehicle_t ego);
+
+  bool _detect_collision();
 };
 
 

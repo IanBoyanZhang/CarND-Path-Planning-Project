@@ -28,6 +28,10 @@ static double from_lane_to_d(int lane) {
   return 2 + lane * 4;
 }
 
+static double l2dist(vector<double> A, vector<double> B) {
+	return sqrt(pow((A[0] - B[0]), 2) + pow((A[1], B[1]), 2));
+}
+
 class utils {
 
 public:

@@ -74,16 +74,48 @@ vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
   return {vs, vd};
 }
 
-void BehaviorPlanner::predict() {
+/**
+ * Return all target vehicles location snapshot in (s, d) at t
+ * @param ego
+ * @param t
+ * @return
+ */
+vector<vector<double> > BehaviorPlanner::predict(vehicle_t ego, double t) {
+  vector<vector<double> > predictions = getTargetFrenetVelocity();
 
+  vector<vector<double> > filtered_target_list;
+
+  // Filtering prediction list
+  for (auto i = 0; i < predictions.size(); i+=1) {
+    // On the RHS lanes
+    if (predictions[i][3] < 0) {
+      continue;
+    }
+
+    // Distance > xx skip
+    if (l2dist({ego.s, ego.d}, {predictions[i][1], predictions[i][3]})
+        > COLLISION_DIST_THRESHOLD) {
+      continue;
+    }
+
+    filtered_target_list.push_back(predictions[i]);
+  }
+
+  vector<vector<double> > targets_at_t;
+  // Predict target list
+  vector<double> target;
+  for (auto i = 0; i < filtered_target_list.size(); i+=1) {
+    target = filtered_target_list[i];
+    targets_at_t.push_back({target[0], target[1] * target[2] * t, target[3] * target[4]});
+  }
+  return targets_at_t;
 }
 
 void BehaviorPlanner::setCostCoeffs(planner_cost_t plannerCost) {
   _plannerCost = plannerCost;
 }
 
-double BehaviorPlanner::_distance_from_goal_lane(vehicle_t ego, ptg_t trajectory, int lane) {
-  // TODO: calculate distance to end goal lane
+double BehaviorPlanner::_distance_from_goal_lane(vehicle_t ego, int lane) {
   double distance = abs(ego.d - from_lane_to_d(lane));
   distance = max(distance, 1.0);
 
@@ -91,7 +123,18 @@ double BehaviorPlanner::_distance_from_goal_lane(vehicle_t ego, ptg_t trajectory
   double time_to_goal = (double) distance/ego.vd;
 
   // Punish movement towards right lanes
-  double multiplier = (double)(5 * lane / time_to_goal);
+  double multiplier = (double)(MOVE_TO_LEFT_LANE * lane / time_to_goal);
 
   return multiplier * _plannerCost.REACH_GOAL;
+}
+
+double BehaviorPlanner::_inefficiency_cost(vehicle_t ego, double target_speed) {
+  double diff = ego.car_speed - target_speed;
+  double pct = (double)diff/target_speed;
+  double multiplier = pow(pct, 2);
+  return multiplier * _plannerCost.EFFICIENCY;
+}
+
+bool BehaviorPlanner::_detect_collision() {
+  return false;
 }

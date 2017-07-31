@@ -237,6 +237,8 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 
 	// Sort for dealing with track wrap around
 	// TODO: smooth transition using relative distance
+
+	// TODO: Wrapping around inconsitancy is still an issue
   auto p = sort_permutation(wp_s, less<double>());
 
 	wp_s = apply_permutation(wp_s, p);
@@ -277,15 +279,8 @@ vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::
 	//return {x + d * dx/1000, y + d * dy/1000};
 	return {x + d * dx/1000, y + d * dy/1000};
 }
-template <typename T>
-T l2dist(vector<double> A, vector<double> B) {
-	return sqrt(pow((A[0] - B[0]), 2) + pow((A[1], B[1]), 2));
-}
 
-template <typename T>
-void isLarger(vector<double> current, vector<double> prev) {
 
-}
 
 int main() {
   uWS::Hub h;
@@ -414,7 +409,7 @@ int main() {
 
 					// Predict with dynamics or not?
 					// Sample coordinate transform
-          double s_diff = 0.3;
+          double s_diff = 0.45;
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
@@ -440,9 +435,9 @@ int main() {
 					}
 
 					for (int i = 0; i < 50 - path_size; i+=1) {
-						container = getTargetXY(pos_s + s_diff * (i + 1), 3, wp_sp);
+						container = getTargetXY(pos_s + s_diff * (i + 1), 1, wp_sp);
 						// TODO: upsampling current steps to include further predictions
-						// TODO: filtering the packets using euclidean distance
+						// TODO: filtering the packets using euclidean distance?
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
 					}

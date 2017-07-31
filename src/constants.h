@@ -19,6 +19,9 @@ struct weighted_cost_func_t{
   double total_accel_cost = 1;
 };
 
+static double COLLISION_DIST_THRESHOLD = 100;
+static double MOVE_TO_LEFT_LANE = 5;
+
 // Declaration
 // https://stackoverflow.com/questions/4266914/how-does-a-const-struct-differ-from-a-struct
 // const struct weigthed_cost_func WEIGHTED_COST_FUNCTIONS;
@@ -71,5 +74,11 @@ struct vehicle_t {
   double vd;
   double car_speed;
   double yaw;
+};
+
+// Trajectory in (s, d) space
+struct traj_sd_t {
+  std::vector<double> s;
+  std::vector<double> d;
 };
 #endif //PATH_PLANNING_CONSTANTS_H
