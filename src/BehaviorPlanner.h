@@ -17,7 +17,7 @@ public:
   BehaviorPlanner();
   BehaviorPlanner(const tk::spline spline_dx, const tk::spline spline_dy);
   void updateSensorReading(const vector<vector<double> > sensor_fusion);
-  vector<double> predict();
+  vector<vector<double> > predict(double t);
 private:
   vector< vector< double> > _sensor_fusion;
   tk::spline _spline_dx;
