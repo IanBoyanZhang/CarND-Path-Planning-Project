@@ -216,8 +216,8 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	vector<double> wp_dy;
 	int wp_id;
 
-	int back_track_id = -6;
-	for (int i = back_track_id; i < 10; i+=1) {
+	int back_track_id = -10;
+	for (int i = back_track_id; i < 15; i+=1) {
 	//for (int i = 0, len = 7; i < len; i+=1) {
 		wp_id = (prev_wp + i)%maps_x.size();
 
@@ -423,15 +423,16 @@ int main() {
 					cout << "pos_x" << pos_x << endl;
 					cout << "pos_y" << pos_y << endl;
 
-					for (int i = 0; i < path_size; i+=1) {
+/*					for (int i = 0; i < path_size; i+=1) {
 						cout << "prev_x: " << previous_path_x[i] << endl;
 						cout << "prev_y: " << previous_path_y[i] << endl;
-					}
+					}*/
 
 					wp_sp = fitXY(pos_s, map_waypoints_s,
 												map_waypoints_x, map_waypoints_y,
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
+
 
 					for(int i = 0; i < path_size; i+=1) {
 						next_x_vals.push_back(previous_path_x[i]);

@@ -12,16 +12,18 @@ BehaviorPlanner::BehaviorPlanner(const tk::spline spline_dx, const tk::spline sp
 void BehaviorPlanner::updateSensorReading(const vector< vector<double> > sensor_fusion) {
   _sensor_fusion = sensor_fusion;
 }
+
 /**
  * TODO: filtering car when it is too far away,
  * and within reasonable time frame
+ * @param
  * @return
  */
-vector<vector<double> > BehaviorPlanner::predict(double t) {
+vector<vector<double> > BehaviorPlanner::getTargetFrenetVelocity(){
   // Should we use a struct here?
   vector<vector<double> > predictions;
 
-  int car_id;
+  double car_id;
   double x, y, vx, vy, s, d;
   vector<double> v_sd;
   for (auto i = 0; i < _sensor_fusion.size(); i+=1) {
@@ -34,7 +36,7 @@ vector<vector<double> > BehaviorPlanner::predict(double t) {
     d = _sensor_fusion[i][6];
 
     v_sd = _get_vs_vd(_get_d_norm(s), vx, vy);
-    predictions.push_back({car_id, s + v_sd[0] * t, d + v_sd[1] * t});
+    predictions.push_back({car_id, s, v_sd[0], d, v_sd[1]});
   }
 
   return predictions;
@@ -70,4 +72,26 @@ vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
   double vs = vy * sin(theta) + vx * cos(theta);
 
   return {vs, vd};
+}
+
+void BehaviorPlanner::predict() {
+
+}
+
+void BehaviorPlanner::setCostCoeffs(planner_cost_t plannerCost) {
+  _plannerCost = plannerCost;
+}
+
+double BehaviorPlanner::_distance_from_goal_lane(vehicle_t ego, ptg_t trajectory, int lane) {
+  // TODO: calculate distance to end goal lane
+  double distance = abs(ego.d - from_lane_to_d(lane));
+  distance = max(distance, 1.0);
+
+  // Only consider d direction movement
+  double time_to_goal = (double) distance/ego.vd;
+
+  // Punish movement towards right lanes
+  double multiplier = (double)(5 * lane / time_to_goal);
+
+  return multiplier * _plannerCost.REACH_GOAL;
 }

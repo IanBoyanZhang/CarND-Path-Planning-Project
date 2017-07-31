@@ -23,6 +23,11 @@ const uint8_t LANE1 = 2;
 const uint8_t LANE2 = 2 + 4;
 const uint8_t LANE3 = 2 + 4 + 4;
 
+// Static is required
+static double from_lane_to_d(int lane) {
+  return 2 + lane * 4;
+}
+
 class utils {
 
 public:

@@ -45,11 +45,31 @@ struct state_t{
   double d_ddot;
 };
 
-
 // TODO: design a better data structure for storing trajectory values
 struct ptg_t {
   std::vector<double> s;
   std::vector<double> d;
   double t;
+};
+
+struct planner_cost_t {
+  double COLLISION;
+  double DANGER;
+  double REACH_GOAL;
+  double COMFORT;
+  double EFFICIENCY;
+
+  double DESIRED_BUFFER;
+  double PLANNING_HORIZON;
+};
+
+// vs^2 + vd^2 = car_speed^2?
+struct vehicle_t {
+  double s;
+  double d;
+  double vs;
+  double vd;
+  double car_speed;
+  double yaw;
 };
 #endif //PATH_PLANNING_CONSTANTS_H
