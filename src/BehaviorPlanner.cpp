@@ -16,6 +16,10 @@ void BehaviorPlanner::updateSensorReading(const vector< vector<double> > sensor_
   _sensor_fusion = sensor_fusion;
 }
 
+void BehaviorPlanner::setCostCoeffs(planner_cost_t plannerCost) {
+  _plannerCost = plannerCost;
+}
+
 /**
  * TODO: filtering car when it is too far away,
  * and within reasonable time frame
@@ -44,6 +48,44 @@ vector<vector<double> > BehaviorPlanner::_getTargetFrenetVelocity(){
 
   return predictions;
 }
+
+/**
+ * Return all target vehicles location snapshot in (s, d) at t
+ * @param ego
+ * @param t
+ * @return
+ */
+vector<vector<double> > BehaviorPlanner::_filter(vehicle_t ego, double t,
+                                                 vector<vector<double> > predictions) {
+  vector<vector<double> > filtered_target_list;
+
+  // Filtering prediction list
+  for (auto i = 0; i < predictions.size(); i+=1) {
+    // On the RHS lanes
+    if (predictions[i][3] < 0) {
+      continue;
+    }
+
+    // Distance > xx skip
+    if (l2dist({ego.x, ego.y}, {predictions[i][5], predictions[i][6]})
+        > DETECT_DIST_THRESHOLD) {
+      continue;
+    }
+
+
+    filtered_target_list.push_back(predictions[i]);
+  }
+
+  vector<vector<double> > targets_at_t;
+  // Predict target list
+  vector<double> target;
+  for (auto i = 0; i < filtered_target_list.size(); i+=1) {
+    target = filtered_target_list[i];
+    targets_at_t.push_back({target[0], target[1] * target[2] * t, target[3] * target[4]});
+  }
+  return targets_at_t;
+}
+
 /**
  * Get normal vector perpendicular to the road curvature
  * @param s
@@ -77,48 +119,6 @@ vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
   return {vs, vd};
 }
 
-/**
- * Return all target vehicles location snapshot in (s, d) at t
- * @param ego
- * @param t
- * @return
- */
-vector<vector<double> > BehaviorPlanner::_predict(vehicle_t ego, double t) {
-  vector<vector<double> > predictions = _getTargetFrenetVelocity();
-
-  vector<vector<double> > filtered_target_list;
-
-  // Filtering prediction list
-  for (auto i = 0; i < predictions.size(); i+=1) {
-    // On the RHS lanes
-    if (predictions[i][3] < 0) {
-      continue;
-    }
-
-    // Distance > xx skip
-    if (l2dist({ego.x, ego.y}, {predictions[i][5], predictions[i][6]})
-        > DETECT_DIST_THRESHOLD) {
-      continue;
-    }
-
-
-    filtered_target_list.push_back(predictions[i]);
-  }
-
-  vector<vector<double> > targets_at_t;
-  // Predict target list
-  vector<double> target;
-  for (auto i = 0; i < filtered_target_list.size(); i+=1) {
-    target = filtered_target_list[i];
-    targets_at_t.push_back({target[0], target[1] * target[2] * t, target[3] * target[4]});
-  }
-  return targets_at_t;
-}
-
-void BehaviorPlanner::setCostCoeffs(planner_cost_t plannerCost) {
-  _plannerCost = plannerCost;
-}
-
 double BehaviorPlanner::_distance_from_goal_lane(vehicle_t ego, int lane) {
   double distance = abs(ego.d - from_lane_to_d(lane));
   distance = max(distance, 1.0);
@@ -139,8 +139,9 @@ double BehaviorPlanner::_inefficiency_cost(vehicle_t ego, double target_speed) {
   return multiplier * _plannerCost.EFFICIENCY;
 }
 
-double BehaviorPlanner::_collision_cost(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
-  double time_til_collision = _will_collide_at(ego, trajectory, t_inc, T);
+double BehaviorPlanner::_collision_cost(traj_sd_t trajectory, double t_inc, double T,
+                                        vector<vector<double> > target_list) {
+  double time_til_collision = _will_collide_at(trajectory, t_inc, T, target_list);
   if (time_til_collision == NO_COLLISION_THRESHOLD) { return 0; }
   double exponent = pow(time_til_collision, 2);
   double mult = exp(exponent);
@@ -160,22 +161,20 @@ bool BehaviorPlanner::_collides_with(vehicle_t ego, vehicle_t other){
  * @param T
  */
 
-double BehaviorPlanner::_will_collide_at(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
+double BehaviorPlanner::_will_collide_at(traj_sd_t trajectory, double t_inc, double T,
+                                         vector<vector<double> >target_list) {
   double t_steps = T/t_inc;
   double curr_time = 0;
 
   double shortest_collision_time = NO_COLLISION_THRESHOLD;
-  // Progress time
-  vector<vector<double> > target_list;
+  vehicle_t ego_at_t;
+  vehicle_t other;
+  // Progress in time
   for (auto i = 0; i < t_steps; i+=1) {
     curr_time += t_inc;
 
-    vehicle_t ego_at_t;
     ego_at_t.s = trajectory.s[i];
     ego_at_t.d = trajectory.d[i];
-
-    target_list = _predict(ego, curr_time);
-    vehicle_t other;
 
     // check if they will collide
     for (auto i = 0; i < target_list.size(); i+=1) {
