@@ -22,12 +22,15 @@ struct weighted_cost_func_t{
 // Threshold
 static double DETECT_DIST_THRESHOLD = 100;
 static double COLLIDE_THRESHOLD = 2.5;
-static double SAME_LANE_DETECTION_THRESHOLD = 0.1;
+// center difference in 1 meter, considering the two vehicles in same lane
+static double SAME_LANE_DETECTION_THRESHOLD = 1;
 static double NO_COLLISION_THRESHOLD = 1e6; //s
 
 // Weights
 static double MOVE_TO_LEFT_LANE = 5;
 static double COLLISION = 1e6;
+static double DESIRED_BUFFER = 2; // timesteps
+static double DANGER = 1e5;
 
 // Declaration
 // https://stackoverflow.com/questions/4266914/how-does-a-const-struct-differ-from-a-struct

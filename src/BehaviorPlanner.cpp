@@ -55,7 +55,7 @@ vector<vector<double> > BehaviorPlanner::_getTargetFrenetVelocity(){
  * @param t
  * @return
  */
-vector<vector<double> > BehaviorPlanner::_filter(vehicle_t ego, double t,
+vector<vector<double> > BehaviorPlanner::_filter(vehicle_t ego,
                                                  vector<vector<double> > predictions) {
   vector<vector<double> > filtered_target_list;
 
@@ -76,14 +76,15 @@ vector<vector<double> > BehaviorPlanner::_filter(vehicle_t ego, double t,
     filtered_target_list.push_back(predictions[i]);
   }
 
-  vector<vector<double> > targets_at_t;
-  // Predict target list
-  vector<double> target;
-  for (auto i = 0; i < filtered_target_list.size(); i+=1) {
-    target = filtered_target_list[i];
-    targets_at_t.push_back({target[0], target[1] * target[2] * t, target[3] * target[4]});
-  }
-  return targets_at_t;
+  return filtered_target_list;
+}
+
+void BehaviorPlanner::plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
+  vector<vector<double> > predictions = _getTargetFrenetVelocity();
+  predictions = _filter(ego, predictions);
+
+  // TODO: cost calculation
+
 }
 
 /**
@@ -139,13 +140,32 @@ double BehaviorPlanner::_inefficiency_cost(vehicle_t ego, double target_speed) {
   return multiplier * _plannerCost.EFFICIENCY;
 }
 
-double BehaviorPlanner::_collision_cost(traj_sd_t trajectory, double t_inc, double T,
-                                        vector<vector<double> > target_list) {
-  double time_til_collision = _will_collide_at(trajectory, t_inc, T, target_list);
+double BehaviorPlanner::_collision_cost(double time_til_collision) {
   if (time_til_collision == NO_COLLISION_THRESHOLD) { return 0; }
   double exponent = pow(time_til_collision, 2);
   double mult = exp(exponent);
   return mult * COLLISION;
+}
+
+double BehaviorPlanner::_buffer_cost(double shortest_dist_in_movement,
+                                     double shortest_time_to_min_buffer) {
+  if (shortest_dist_in_movement == 0) { return 10 * DANGER; }
+  if (shortest_time_to_min_buffer > DESIRED_BUFFER) { return 0; }
+  double multiplier = 1.0 - pow((shortest_time_to_min_buffer / DESIRED_BUFFER), 2);
+  return multiplier * DANGER;
+}
+
+/**
+ * Only consider vehicles in same lane or will be in same lane
+ * @param ego
+ * @param other
+ * @return
+ */
+double BehaviorPlanner::_get_buffer_dist(vehicle_t ego, vehicle_t other) {
+  if (abs(ego.d - other.d) < SAME_LANE_DETECTION_THRESHOLD) {
+    return abs(ego.s - other.s);
+  }
+  return NO_COLLISION_THRESHOLD;
 }
 
 bool BehaviorPlanner::_collides_with(vehicle_t ego, vehicle_t other){
@@ -160,13 +180,15 @@ bool BehaviorPlanner::_collides_with(vehicle_t ego, vehicle_t other){
  * @param t_inc
  * @param T
  */
-
-double BehaviorPlanner::_will_collide_at(traj_sd_t trajectory, double t_inc, double T,
+vector<double> BehaviorPlanner::_will_collide_at(traj_sd_t trajectory, double t_inc, double T,
                                          vector<vector<double> >target_list) {
   double t_steps = T/t_inc;
   double curr_time = 0;
 
   double shortest_collision_time = NO_COLLISION_THRESHOLD;
+
+  double shortest_distance = NO_COLLISION_THRESHOLD;
+  double shortest_time_to_min_buffer = NO_COLLISION_THRESHOLD;
   vehicle_t ego_at_t;
   vehicle_t other;
   // Progress in time
@@ -178,14 +200,24 @@ double BehaviorPlanner::_will_collide_at(traj_sd_t trajectory, double t_inc, dou
 
     // check if they will collide
     for (auto i = 0; i < target_list.size(); i+=1) {
-      other.s = target_list[i][1];
-      other.d = target_list[i][2];
+      other.s = target_list[i][1] + target_list[i][2] * curr_time;
+      other.d = target_list[i][3] + target_list[i][4] * curr_time;
 
       // Will collide
       if (_collides_with(ego_at_t, other)) {
         shortest_collision_time = min(curr_time, shortest_collision_time);
+        shortest_distance = 0;
+        shortest_time_to_min_buffer = shortest_collision_time;
+      }
+
+      // Calculate buffer zone
+      double dist = _get_buffer_dist(ego_at_t, other);
+      if (dist < shortest_distance) {
+        shortest_distance = dist;
+        shortest_time_to_min_buffer = curr_time;
       }
     }
   }
-  return shortest_collision_time;
+  return {shortest_collision_time, shortest_distance, shortest_time_to_min_buffer};
 }
+
