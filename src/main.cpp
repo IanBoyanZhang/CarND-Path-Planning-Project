@@ -221,14 +221,18 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	//for (int i = 0, len = 7; i < len; i+=1) {
 		wp_id = (prev_wp + i)%maps_x.size();
 
+		if (wp_id < 0) {
+			wp_id += maps_s.size();
+		}
+
 		wp_s.push_back(maps_s[wp_id]);
 		wp_x.push_back(maps_x[wp_id]);
 		wp_y.push_back(maps_y[wp_id]);
 		// For better numerically stability
-		wp_dx.push_back(maps_dx[wp_id] );
-		//wp_dx.push_back(maps_dx[wp_id] * 1000);
-		wp_dy.push_back(maps_dy[wp_id] );
-		//wp_dy.push_back(maps_dy[wp_id] * 1000);
+		// wp_dx.push_back(maps_dx[wp_id]);
+		wp_dx.push_back(maps_dx[wp_id] * 1000);
+		// wp_dy.push_back(maps_dy[wp_id]);
+		wp_dy.push_back(maps_dy[wp_id] * 1000);
 	}
 
 	// Sort for dealing with track wrap around
@@ -268,8 +272,7 @@ vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::
 	/**
 	 * lane = 0, 1, 2
 	 */
-	//const int d = 2 + lane * 4;
-	const int d = 0;
+	const int d = 2 + lane * 4;
 
 	//return {x + d * dx/1000, y + d * dy/1000};
 	return {x + d * dx/1000, y + d * dy/1000};
@@ -386,10 +389,9 @@ int main() {
 
 					int path_size = previous_path_x.size();
 
-					for (int i = 0; i < path_size; i+=1) {
-						cout << "prev_x: " << previous_path_x[i] << endl;
-						cout << "prev_y: " << previous_path_y[i] << endl;
-					}
+//          if (path_size != 0) {
+//						path_size = 10;
+//					}
 
 					if(path_size == 0) {
 						pos_x = car_x;
@@ -407,7 +409,7 @@ int main() {
 						// angle = deg2rad(car_yaw);
             pos_s = end_path_s;
 //						pos_s = getFrenet(pos_x, pos_y, angle,
-//															map_waypoints_x, map_waypoints_y);
+//															map_waypoints_x, map_waypoints_y)[0];
 					}
 
 					// Predict with dynamics or not?
@@ -421,6 +423,11 @@ int main() {
 					cout << "pos_x" << pos_x << endl;
 					cout << "pos_y" << pos_y << endl;
 
+					for (int i = 0; i < path_size; i+=1) {
+						cout << "prev_x: " << previous_path_x[i] << endl;
+						cout << "prev_y: " << previous_path_y[i] << endl;
+					}
+
 					wp_sp = fitXY(pos_s, map_waypoints_s,
 												map_waypoints_x, map_waypoints_y,
 												map_waypoints_dx, map_waypoints_dy,
@@ -432,7 +439,7 @@ int main() {
 					}
 
 					for (int i = 0; i < 50 - path_size; i+=1) {
-						container = getTargetXY(pos_s + s_diff * i, 3, wp_sp);
+						container = getTargetXY(pos_s + s_diff * (i + 1), 3, wp_sp);
 						// TODO: upsampling current steps to include further predictions
 						// TODO: filtering the packets using euclidean distance
             next_x_vals.push_back(container[0]);
