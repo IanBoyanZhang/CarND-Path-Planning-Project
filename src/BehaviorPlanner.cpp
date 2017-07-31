@@ -4,9 +4,12 @@
 
 #include "BehaviorPlanner.h"
 
-BehaviorPlanner::BehaviorPlanner(const tk::spline spline_dx, const tk::spline spline_dy) {
+void BehaviorPlanner::updateSplines(tk::spline spline_dx, tk::spline spline_dy,
+                                    tk::spline spline_x, tk::spline spline_y) {
   _spline_dx = spline_dx;
   _spline_dy = spline_dy;
+  _spline_x = spline_x;
+  _spline_y = spline_y;
 }
 
 void BehaviorPlanner::updateSensorReading(const vector< vector<double> > sensor_fusion) {
@@ -19,7 +22,7 @@ void BehaviorPlanner::updateSensorReading(const vector< vector<double> > sensor_
  * @param
  * @return
  */
-vector<vector<double> > BehaviorPlanner::getTargetFrenetVelocity(){
+vector<vector<double> > BehaviorPlanner::_getTargetFrenetVelocity(){
   // Should we use a struct here?
   vector<vector<double> > predictions;
 
@@ -36,7 +39,7 @@ vector<vector<double> > BehaviorPlanner::getTargetFrenetVelocity(){
     d = _sensor_fusion[i][6];
 
     v_sd = _get_vs_vd(_get_d_norm(s), vx, vy);
-    predictions.push_back({car_id, s, v_sd[0], d, v_sd[1]});
+    predictions.push_back({car_id, s, v_sd[0], d, v_sd[1], x, y});
   }
 
   return predictions;
@@ -80,8 +83,8 @@ vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
  * @param t
  * @return
  */
-vector<vector<double> > BehaviorPlanner::predict(vehicle_t ego, double t) {
-  vector<vector<double> > predictions = getTargetFrenetVelocity();
+vector<vector<double> > BehaviorPlanner::_predict(vehicle_t ego, double t) {
+  vector<vector<double> > predictions = _getTargetFrenetVelocity();
 
   vector<vector<double> > filtered_target_list;
 
@@ -93,10 +96,11 @@ vector<vector<double> > BehaviorPlanner::predict(vehicle_t ego, double t) {
     }
 
     // Distance > xx skip
-    if (l2dist({ego.s, ego.d}, {predictions[i][1], predictions[i][3]})
-        > COLLISION_DIST_THRESHOLD) {
+    if (l2dist({ego.x, ego.y}, {predictions[i][5], predictions[i][6]})
+        > DETECT_DIST_THRESHOLD) {
       continue;
     }
+
 
     filtered_target_list.push_back(predictions[i]);
   }
@@ -135,6 +139,54 @@ double BehaviorPlanner::_inefficiency_cost(vehicle_t ego, double target_speed) {
   return multiplier * _plannerCost.EFFICIENCY;
 }
 
-bool BehaviorPlanner::_detect_collision() {
-  return false;
+double BehaviorPlanner::_collision_cost(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
+  double time_til_collision = _will_collide_at(ego, trajectory, t_inc, T);
+  if (time_til_collision == NO_COLLISION_THRESHOLD) { return 0; }
+  double exponent = pow(time_til_collision, 2);
+  double mult = exp(exponent);
+  return mult * COLLISION;
+}
+
+bool BehaviorPlanner::_collides_with(vehicle_t ego, vehicle_t other){
+  return abs(ego.d - other.d) < SAME_LANE_DETECTION_THRESHOLD &&
+          abs(ego.s - other.s) <= COLLIDE_THRESHOLD;
+}
+
+/**
+ * car_id, s, v_sd[0], d, v_sd[1], x, y
+ * @param ego
+ * @param trajectory
+ * @param t_inc
+ * @param T
+ */
+
+double BehaviorPlanner::_will_collide_at(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
+  double t_steps = T/t_inc;
+  double curr_time = 0;
+
+  double shortest_collision_time = NO_COLLISION_THRESHOLD;
+  // Progress time
+  vector<vector<double> > target_list;
+  for (auto i = 0; i < t_steps; i+=1) {
+    curr_time += t_inc;
+
+    vehicle_t ego_at_t;
+    ego_at_t.s = trajectory.s[i];
+    ego_at_t.d = trajectory.d[i];
+
+    target_list = _predict(ego, curr_time);
+    vehicle_t other;
+
+    // check if they will collide
+    for (auto i = 0; i < target_list.size(); i+=1) {
+      other.s = target_list[i][1];
+      other.d = target_list[i][2];
+
+      // Will collide
+      if (_collides_with(ego_at_t, other)) {
+        shortest_collision_time = min(curr_time, shortest_collision_time);
+      }
+    }
+  }
+  return shortest_collision_time;
 }
