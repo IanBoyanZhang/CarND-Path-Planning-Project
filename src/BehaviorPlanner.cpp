@@ -44,7 +44,7 @@ vector<double> BehaviorPlanner::_get_d_norm(const double s) {
   return {dx, dy};
 }
 
-vector<double> BehaviorPlanner::_get_vd_vs(const vector<double> d_norm,
+vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
                                            const double vx, const double vy) {
   double dx = d_norm[0];
   double dy = d_norm[1];
@@ -55,5 +55,5 @@ vector<double> BehaviorPlanner::_get_vd_vs(const vector<double> d_norm,
   double vd = vy * cos(theta) + vx * sin(theta);
   double vs = vy * sin(theta) + vx * cos(theta);
 
-  return {vd, vs};
+  return {vs, vd};
 }

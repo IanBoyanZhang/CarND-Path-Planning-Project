@@ -23,7 +23,7 @@ private:
   tk::spline _spline_dx;
   tk::spline _spline_dy;
   vector<double> _get_d_norm(const double s);
-  vector<double> _get_vd_vs(const vector<double> d_norm, const double vx, const double vy);
+  vector<double> _get_vs_vd(const vector<double> d_norm, const double vx, const double vy);
 };
 
 
