@@ -113,7 +113,7 @@ vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
   double dy = d_norm[1];
 
   // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
-  double theta = atan2(vy, vx) - atan2(dy, dx);
+  double theta = atan2(vy, vx) - atan2(dx, dy);
 
   double vd = vy * cos(theta) + vx * sin(theta);
   double vs = -vy * sin(theta) + vx * cos(theta);
