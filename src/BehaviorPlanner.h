@@ -45,6 +45,9 @@ private:
   // TODO: remove usage of ego
   vector<double> _will_collide_at(traj_sd_t trajectory, double t_inc, double T,
                           vector<vector<double> > target_list);
+
+  // TODO:
+  double _calculate_cost();
 };
 
 

@@ -82,9 +82,7 @@ vector<vector<double> > BehaviorPlanner::_filter(vehicle_t ego,
 void BehaviorPlanner::plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
   vector<vector<double> > predictions = _getTargetFrenetVelocity();
   predictions = _filter(ego, predictions);
-
   // TODO: cost calculation
-
 }
 
 /**
@@ -221,3 +219,6 @@ vector<double> BehaviorPlanner::_will_collide_at(traj_sd_t trajectory, double t_
   return {shortest_collision_time, shortest_distance, shortest_time_to_min_buffer};
 }
 
+double BehaviorPlanner::_calculate_cost() {
+
+}

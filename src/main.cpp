@@ -418,11 +418,6 @@ int main() {
 					cout << "pos_x" << pos_x << endl;
 					cout << "pos_y" << pos_y << endl;
 
-/*					for (int i = 0; i < path_size; i+=1) {
-						cout << "prev_x: " << previous_path_x[i] << endl;
-						cout << "prev_y: " << previous_path_y[i] << endl;
-					}*/
-
 					wp_sp = fitXY(pos_s, map_waypoints_s,
 												map_waypoints_x, map_waypoints_y,
 												map_waypoints_dx, map_waypoints_dy,
