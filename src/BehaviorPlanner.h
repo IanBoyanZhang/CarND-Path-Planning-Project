@@ -47,7 +47,9 @@ private:
                           vector<vector<double> > target_list);
 
   // TODO:
-  double _calculate_cost();
+  double _calculate_cost(vehicle_t ego, int lane, double target_speed, traj_sd_t trajectory,
+                         double t_inc, double T, vector<vector<double> > target_list);
+
 };
 
 

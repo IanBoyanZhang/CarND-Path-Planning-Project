@@ -104,16 +104,19 @@ vector<double> BehaviorPlanner::_get_d_norm(const double s) {
  * @param vy
  * @return
  */
+
+// TODO: Get vs vd is wrong, we need to fix this?
+// Maybe introduce new variable as car_yaw?
 vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
                                            const double vx, const double vy) {
   double dx = d_norm[0];
   double dy = d_norm[1];
 
   // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
-  double theta = atan2(dy, dx);
+  double theta = atan2(vy/vx) - atan2(dy, dx);
 
   double vd = vy * cos(theta) + vx * sin(theta);
-  double vs = vy * sin(theta) + vx * cos(theta);
+  double vs = -vy * sin(theta) + vx * cos(theta);
 
   return {vs, vd};
 }
@@ -219,6 +222,12 @@ vector<double> BehaviorPlanner::_will_collide_at(traj_sd_t trajectory, double t_
   return {shortest_collision_time, shortest_distance, shortest_time_to_min_buffer};
 }
 
-double BehaviorPlanner::_calculate_cost() {
-
+double BehaviorPlanner::_calculate_cost(vehicle_t ego, int lane, double target_speed,
+                                        traj_sd_t trajectory, double t_inc, double T,
+                                        vector<vector<double> > target_list) {
+  // We will do it
+  double distance_cost = _distance_from_goal_lane(ego, lane);
+  double inefficiency_cost = _inefficiency_cost(ego, target_speed);
+//  double collision_cost = _collision_cost();
+  return 0;
 }
