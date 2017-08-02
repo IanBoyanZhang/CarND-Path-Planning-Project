@@ -113,7 +113,7 @@ vector<double> BehaviorPlanner::_get_vs_vd(const vector<double> d_norm,
   double dy = d_norm[1];
 
   // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
-  double theta = atan2(vy, vx) - atan2(dx, dy);
+  double theta = atan2(vy, vx) - atan2(-dx, dy);
 
   double vd = vy * cos(theta) + vx * sin(theta);
   double vs = -vy * sin(theta) + vx * cos(theta);
@@ -141,9 +141,9 @@ double BehaviorPlanner::_inefficiency_cost(vehicle_t ego, double target_speed) {
   return multiplier * _plannerCost.EFFICIENCY;
 }
 
-double BehaviorPlanner::_collision_cost(double time_til_collision) {
-  if (time_til_collision == NO_COLLISION_THRESHOLD) { return 0; }
-  double exponent = pow(time_til_collision, 2);
+double BehaviorPlanner::_collision_cost(double time_till_collision) {
+  if (time_till_collision == NO_COLLISION_THRESHOLD) { return 0; }
+  double exponent = pow(time_till_collision, 2);
   double mult = exp(exponent);
   return mult * COLLISION;
 }
