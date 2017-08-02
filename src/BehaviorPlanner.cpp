@@ -83,6 +83,19 @@ void BehaviorPlanner::plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, do
   vector<vector<double> > predictions = _getTargetFrenetVelocity();
   predictions = _filter(ego, predictions);
   // TODO: cost calculation
+
+  vector<double> collide_prediction = _will_collide_at(trajectory, t_inc, T, predictions);
+
+  double shortest_collision_time = collide_prediction[0];
+  double shortest_distance = collide_prediction[1];
+  double shortest_time_to_min_buffer = collide_prediction[2];
+
+  // From state machine planner
+
+  // TODO: cycling through different states to evaluate costs
+  double lane = 1;
+  double target_speed = TARGET_SPEED; //mph
+  double cost = _calculate_cost(ego, lane, target_speed, trajectory, t_inc, T, predictions);
 }
 
 /**
@@ -229,5 +242,6 @@ double BehaviorPlanner::_calculate_cost(vehicle_t ego, int lane, double target_s
   double distance_cost = _distance_from_goal_lane(ego, lane);
   double inefficiency_cost = _inefficiency_cost(ego, target_speed);
 //  double collision_cost = _collision_cost();
+
   return 0;
 }

@@ -25,12 +25,29 @@ static double COLLIDE_THRESHOLD = 2.5;
 // center difference in 1 meter, considering the two vehicles in same lane
 static double SAME_LANE_DETECTION_THRESHOLD = 1;
 static double NO_COLLISION_THRESHOLD = 1e6; //s
+static double TARGET_SPEED = 49; // mph
 
 // Weights
 static double MOVE_TO_LEFT_LANE = 5;
 static double COLLISION = 1e6;
 static double DESIRED_BUFFER = 2; // timesteps
 static double DANGER = 1e5;
+
+// States definition
+/*
+ * "KL" - Keep Lane
+ * The vehicle will attempt to drive its target speed, unless there is
+ * traffic in front of it, in which case it will slow down.
+ *
+ * "LCL" or "LCR" - Lane Change Left / Right
+ * The vehicle will IMMEDIATELY change lanes and then follow longitudinal
+ * behavior for the "KL" state in the new lane.
+ *
+ * "PLCL" or "PLCR" - Prepare for Lane Change Left / Right
+ * The vehicle will find the nearest vehicle in the adjacent lane which is
+ * BEHIND itself and will adjust speed to try to get behind that vehicle.
+ */
+enum State {KL, LCL, LCR, PLCL, PLCR};
 
 // Declaration
 // https://stackoverflow.com/questions/4266914/how-does-a-const-struct-differ-from-a-struct
