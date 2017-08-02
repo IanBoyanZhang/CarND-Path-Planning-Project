@@ -95,7 +95,7 @@ void BehaviorPlanner::plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, do
   // TODO: cycling through different states to evaluate costs
   double lane = 1;
   double target_speed = TARGET_SPEED; //mph
-  double cost = _calculate_cost(ego, lane, target_speed, trajectory, t_inc, T, predictions);
+//  double cost = _calculate_cost(ego, lane, target_speed, trajectory, t_inc, T, predictions);
 }
 
 /**

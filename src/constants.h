@@ -47,6 +47,7 @@ static double DANGER = 1e5;
  * The vehicle will find the nearest vehicle in the adjacent lane which is
  * BEHIND itself and will adjust speed to try to get behind that vehicle.
  */
+// 0, 1, 2, 3, 4
 enum State {KL, LCL, LCR, PLCL, PLCR};
 
 // Declaration

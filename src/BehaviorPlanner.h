@@ -26,6 +26,8 @@ public:
   void plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T);
 
 private:
+  int _state;
+
   vector< vector< double> > _sensor_fusion;
   tk::spline _spline_x;
   tk::spline _spline_y;
