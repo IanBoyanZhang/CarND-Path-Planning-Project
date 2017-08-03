@@ -6,6 +6,7 @@
 #define PATH_PLANNING_CONSTANTS_H
 
 #include <vector>
+#include <limits>
 struct weighted_cost_func_t{
   double time_diff_cost = 1;
   double s_diff_cost = 1;
@@ -19,13 +20,31 @@ struct weighted_cost_func_t{
   double total_accel_cost = 1;
 };
 
+// Actual track length?
+static double _MAX_S = 6914.14925765991;
+
 // Threshold
 static double DETECT_DIST_THRESHOLD = 100;
 static double COLLIDE_THRESHOLD = 2.5;
 // center difference in 1 meter, considering the two vehicles in same lane
+// Overlap
 static double SAME_LANE_DETECTION_THRESHOLD = 1;
 static double NO_COLLISION_THRESHOLD = 1e6; //s
-static double TARGET_SPEED = 49; // mph
+static double TARGET_SPEED = 49; // mph // should it be under SI?
+static double DESIRED_DISTANCE_BUFFER = 6; // 6meter
+
+// Trajectory generation
+// s_dot max over a second
+// static double MAX_SPEED = 24; // mps to 55 mph
+static double MAX_SPEED = 23; // mps to 51.5 mph
+//static double MAX_ACCEL = ?
+// Max s, d accel?
+// Pertubation
+static double N_SAMPLES = 10;
+//SIGMA_S = [10.0, 4.0, 2.0] # s, s_dot, s_double_dot
+//SIGMA_D = [1.0, 1.0, 1.0]
+static double SIGMA_S[3] = {10.0, 4.0, 2.0};
+static double SIGMA_D[3] = {1.0, 1.0, 1.0};
 
 // Weights
 static double MOVE_TO_LEFT_LANE = 5;
@@ -39,6 +58,8 @@ static double DANGER = 1e5;
  * The vehicle will attempt to drive its target speed, unless there is
  * traffic in front of it, in which case it will slow down.
  *
+ * "KLF" - Keep Lane Following
+ *
  * "LCL" or "LCR" - Lane Change Left / Right
  * The vehicle will IMMEDIATELY change lanes and then follow longitudinal
  * behavior for the "KL" state in the new lane.
@@ -48,7 +69,7 @@ static double DANGER = 1e5;
  * BEHIND itself and will adjust speed to try to get behind that vehicle.
  */
 // 0, 1, 2, 3, 4
-enum State {KL, LCL, LCR, PLCL, PLCR};
+enum State {KL, KLF, LCL, LCR, PLCL, PLCR};
 
 // Declaration
 // https://stackoverflow.com/questions/4266914/how-does-a-const-struct-differ-from-a-struct

@@ -26,7 +26,8 @@ public:
   void plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T);
 
 private:
-  int _state;
+  // initial state
+  int _state = KL;
 
   vector< vector< double> > _sensor_fusion;
   tk::spline _spline_x;
@@ -51,6 +52,9 @@ private:
   // TODO:
   double _calculate_cost(vehicle_t ego, int lane, double target_speed, traj_sd_t trajectory,
                          double t_inc, double T, vector<vector<double> > target_list);
+
+  vector<double> _find_closest_in_front(vehicle_t ego, vector<vector<double> > predictions);
+
 
 };
 

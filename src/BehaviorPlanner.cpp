@@ -79,24 +79,6 @@ vector<vector<double> > BehaviorPlanner::_filter(vehicle_t ego,
   return filtered_target_list;
 }
 
-void BehaviorPlanner::plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
-  vector<vector<double> > predictions = _getTargetFrenetVelocity();
-  predictions = _filter(ego, predictions);
-  // TODO: cost calculation
-
-  vector<double> collide_prediction = _will_collide_at(trajectory, t_inc, T, predictions);
-
-  double shortest_collision_time = collide_prediction[0];
-  double shortest_distance = collide_prediction[1];
-  double shortest_time_to_min_buffer = collide_prediction[2];
-
-  // From state machine planner
-
-  // TODO: cycling through different states to evaluate costs
-  double lane = 1;
-  double target_speed = TARGET_SPEED; //mph
-//  double cost = _calculate_cost(ego, lane, target_speed, trajectory, t_inc, T, predictions);
-}
 
 /**
  * Get normal vector perpendicular to the road curvature
@@ -245,3 +227,82 @@ double BehaviorPlanner::_calculate_cost(vehicle_t ego, int lane, double target_s
 
   return 0;
 }
+/**
+ * TODO: Using x, y coordinates to calc distance instead of s diff
+ * or other method to deal with wrap around track?
+ * @param ego
+ * @param predictions
+ * @return
+ */
+vector<double> BehaviorPlanner::_find_closest_in_front(vehicle_t ego,
+                                                       vector<vector<double> > predictions) {
+  double min_distance_to_front = numeric_limits<double>::max();
+  int min_distance_id = -1;
+  auto i = 0;
+  for (; i < predictions.size(); i+=1) {
+    if(abs(predictions[i][3] - ego.d) < SAME_LANE_DETECTION_THRESHOLD &&
+            (predictions[i][1] - ego.s < min_distance_to_front ||
+            predictions[i][1] + _MAX_S - ego.s < min_distance_to_front)) {
+      min_distance_id = i;
+    }
+  }
+  if (min_distance_id > 0) {
+    return predictions[min_distance_id];
+  } else {
+    return {-1};
+  }
+}
+
+void BehaviorPlanner::plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T) {
+  vector<vector<double> > predictions = _getTargetFrenetVelocity();
+  vector<vector<double> > filtered = _filter(ego, predictions);
+  // TODO: cost calculation
+
+  vector<double> collide_prediction = _will_collide_at(trajectory, t_inc, T, filtered);
+
+  double shortest_collision_time = collide_prediction[0];
+  double shortest_distance = collide_prediction[1];
+  double shortest_time_to_min_buffer = collide_prediction[2];
+
+  // From state machine planner
+
+  // TODO: cycling through different states to evaluate costs
+  double lane = 1;
+  double target_speed = TARGET_SPEED; //mph
+//  double cost = _calculate_cost(ego, lane, target_speed, trajectory, t_inc, T, predictions);
+
+  vector<double> ego_vs_vd = _get_vs_vd(_get_d_norm(ego.s),
+                                        ego.car_speed * cos(ego.yaw),
+                                        ego.car_speed * sin(ego.yaw));
+
+  ego.vs = ego_vs_vd[0];
+  ego.vd = ego_vs_vd[1];
+
+  vector<double> end_s;
+  vector<double> end_d;
+  vector<double> start_s;
+  vector<double> start_d;
+  // Serialize states
+  State state;
+  /***************************************************************
+   * Keep Lane State (without obstruction)
+   ***************************************************************/
+  state = KL;
+
+  end_s = {ego.s + ego.vs * T, MAX_SPEED, 0};
+  end_d = {0, 0, 0};
+
+  start_s = {ego.s, ego.vs, 0};
+  start_d = {0, 0, 0};
+
+  /***************************************************************
+   * Keep Lane State (with obstruction)
+   ***************************************************************/
+  state = KLF;
+
+  // Find closest vehicle in front and follow
+  vector<double> closest_front = _find_closest_in_front(ego, filtered);
+  end_s = {min(ego.s + ego.vs * T, closest_front[1] -  DESIRED_DISTANCE_BUFFER),
+               min(MAX_SPEED, closest_front[2]), 0};
+}
+
