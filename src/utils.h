@@ -57,6 +57,8 @@ public:
   double nearest_appraoch(vector<double> traj, vector<Vehicle> vehicles);
   vector<function<double(double)> >
   get_f_and_N_derivatitves(const vector<double>& coeffs);
+
+  double evalute_function(const vector<double>& coeffs, double x);
 };
 
 

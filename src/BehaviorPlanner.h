@@ -17,15 +17,15 @@ using namespace std;
 class BehaviorPlanner {
 public:
   BehaviorPlanner();
-  void updateSplines(tk::spline spline_dx, tk::spline spline_dy,
-                  tk::spline spline_x, tk::spline spline_y);
+  void updateSplines(tk::spline spline_x, tk::spline spline_y,
+                  tk::spline spline_dx, tk::spline spline_dy);
   void setCostCoeffs(planner_cost_t plannerCost);
   void updateSensorReading(const vector<vector<double> > sensor_fusion);
   vector<vector<double> > _getTargetFrenetVelocity();
   vector<vector<double> > _filter(vehicle_t ego, vector<vector<double> > predictions);
   void plan(vehicle_t ego, traj_sd_t trajectory, double t_inc, double T);
 
-private:
+//private:
   // initial state
   int _state = KL;
 

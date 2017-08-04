@@ -4,8 +4,10 @@
 
 #include "BehaviorPlanner.h"
 
-void BehaviorPlanner::updateSplines(tk::spline spline_dx, tk::spline spline_dy,
-                                    tk::spline spline_x, tk::spline spline_y) {
+
+
+void BehaviorPlanner::updateSplines(tk::spline spline_x, tk::spline spline_y,
+                                    tk::spline spline_dx, tk::spline spline_dy) {
   _spline_dx = spline_dx;
   _spline_dy = spline_dy;
   _spline_x = spline_x;

@@ -8,10 +8,27 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
+//#include "BehaviorPlanner.h"
 #include "spline.h"
 #include "PTG.h"
+#include "utils.h"
 
 using namespace std;
+
+
+vector<double> _get_vs_vd(const vector<double> d_norm,
+           const double vx, const double vy) {
+  double dx = d_norm[0];
+  double dy = d_norm[1];
+
+  // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
+  double theta = atan2(vy, vx) - atan2(-dx, dy);
+
+  double vd = vy * cos(theta) + vx * sin(theta);
+  double vs = -vy * sin(theta) + vx * cos(theta);
+
+  return {vs, vd};
+}
 
 // for convenience
 using json = nlohmann::json;
@@ -299,6 +316,14 @@ int main() {
   double max_s = 6945.554;
 
 	PTG Ptg;
+	utils Utils;
+//	BehaviorPlanner BP;
+
+	/*********************************************
+	 * Caching
+	 *********************************************/
+	vector<double> prev_JMT_s_coeffs;
+	vector<double> prev_JMT_d_coeffs;
 
 	bool initialized = false;
 	auto t_begin = chrono::high_resolution_clock::now();
@@ -324,7 +349,9 @@ int main() {
   	map_waypoints_dy.push_back(d_y);
   }
 
-  h.onMessage([&max_s, &initialized, &t_begin, &Ptg,
+  h.onMessage([&max_s, &initialized, &t_begin, &Ptg, &Utils,
+											&prev_JMT_s_coeffs,
+											&prev_JMT_d_coeffs,
 											&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -406,41 +433,103 @@ int main() {
 						double pos_x2 = previous_path_x[path_size - 2];
 						double pos_y2 = previous_path_y[path_size - 2];
             // Which one is right?
-						angle = atan2(pos_y - pos_y2, pos_x - pos_x2);
+						angle = atan2(pos_y2 - pos_y, pos_x2 - pos_x);
 						// angle = deg2rad(car_yaw);
             pos_s = end_path_s;
 //						pos_s = getFrenet(pos_x, pos_y, angle,
 //															map_waypoints_x, map_waypoints_y)[0];
+//						pos_x = previous_path_x[0];
+//						pos_y = previous_path_y[0];
+//
+//						double pos_x2 = previous_path_x[1];
+//            double pos_y2 = previous_path_y[1];
+//						angle = atan2(pos_y2 - pos_y, pos_x2 - pos_x);
+//						pos_s = getFrenet(pos_x, pos_y, angle,
+//															map_waypoints_x, map_waypoints_y)[0];
+
 					}
 
 					// Predict with dynamics or not?
 					// Sample coordinate transform
-          double s_diff = 0.45;
+          double s_diff = 0.30;
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
 
-					cout << "pos_s" << pos_s << endl;
+/*					cout << "pos_s" << pos_s << endl;
 					cout << "pos_x" << pos_x << endl;
-					cout << "pos_y" << pos_y << endl;
+					cout << "pos_y" << pos_y << endl;*/
 
 					wp_sp = fitXY(pos_s, map_waypoints_s,
 												map_waypoints_x, map_waypoints_y,
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
 
+					vector<double> s_start, d_start;
+					vector<double> s_dot_start, s_ddot_start;
+					vector<double> d_dot_start, d_ddot_start;
 
-					for(int i = 0; i < path_size; i+=1) {
+					// JMT
+					double T = 2;
+					vector<double> s_end, d_end;
+					// To mps
+					car_speed *= 0.44704;
+					vector<double> ego_vs_vd = _get_vs_vd({wp_sp[2](pos_s), wp_sp[3](pos_s)},
+																								car_speed * cos(car_yaw),
+																								car_speed * sin(car_yaw));
+
+					int lane = 1;
+					if (path_size == 0) {
+						s_start = {pos_s, 0, 0};
+						// Middle lane
+						d_start = {6, 0, 0};
+						s_end = {pos_s + 20, 20, 0};
+						d_end = {6, 0, 0};
+					} else {
+						// differentiate previous JMT
+						/*s_dot_start = Utils.differentiate(prev_JMT_s_coeffs);
+            s_ddot_start = Utils.differentiate(s_dot_start);
+
+						d_dot_start = Utils.differentiate(prev_JMT_d_coeffs);
+						d_ddot_start = Utils.differentiate(d_dot_start);
+
+            s_start = {pos_s, s_dot_start[4], s_ddot_start[3]};
+            d_start = {6, d_dot_start[4], d_ddot_start[3]};*/
+
+						// TODO: my ego speed is not right
+						s_start = {pos_s, s_diff * 50 , 0};
+						d_start = {6, 0, 0};
+
+						cout << "ego speed vs: " << ego_vs_vd[0] << endl;
+						s_end = {pos_s + s_diff * 50 * 2, 20, 0};
+						d_end = {6, 0, 0};
+					}
+
+					vector<double> s_coeffs = Ptg.JMT(s_start, s_end, T);
+					vector<double> d_coeffs = Ptg.JMT(d_start, d_end, T);
+
+					prev_JMT_s_coeffs = s_coeffs;
+					prev_JMT_d_coeffs = d_coeffs;
+
+					for (int i = 0; i < path_size; i+=1) {
 						next_x_vals.push_back(previous_path_x[i]);
 						next_y_vals.push_back(previous_path_y[i]);
 					}
 
-					for (int i = 0; i < 50 - path_size; i+=1) {
+					for (int i = 0; i < 100 - path_size; i+=1) {
 						container = getTargetXY(pos_s + s_diff * (i + 1), 1, wp_sp);
-						// TODO: upsampling current steps to include further predictions
-						// TODO: filtering the packets using euclidean distance?
             next_x_vals.push_back(container[0]);
 						next_y_vals.push_back(container[1]);
+					}
+
+					double t_inc = 0.02;
+					double s_inc;
+          for (auto i = 0; i < T/t_inc; i+=1) {
+						s_inc = Utils.evalute_function(s_coeffs, t_inc * (i + 1));
+						container = getTargetXY(s_inc, lane, wp_sp);
+						cout << "s_inc:" << s_inc << endl;
+						cout << "x: " << container[0] << endl;
+						cout << "y: " << container[1] << endl;
 					}
 
           cout << "path size: " << path_size << endl;
