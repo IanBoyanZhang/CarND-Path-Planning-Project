@@ -427,7 +427,7 @@ int main() {
 						angle = deg2rad(car_yaw);
             pos_s = car_s;
 					} else {
-						pos_x = previous_path_x[path_size - 1];
+/*						pos_x = previous_path_x[path_size - 1];
 						pos_y = previous_path_y[path_size - 1];
 
 						double pos_x2 = previous_path_x[path_size - 2];
@@ -435,18 +435,17 @@ int main() {
             // Which one is right?
 						angle = atan2(pos_y2 - pos_y, pos_x2 - pos_x);
 						// angle = deg2rad(car_yaw);
-            pos_s = end_path_s;
-//						pos_s = getFrenet(pos_x, pos_y, angle,
-//															map_waypoints_x, map_waypoints_y)[0];
-//						pos_x = previous_path_x[0];
-//						pos_y = previous_path_y[0];
-//
-//						double pos_x2 = previous_path_x[1];
-//            double pos_y2 = previous_path_y[1];
-//						angle = atan2(pos_y2 - pos_y, pos_x2 - pos_x);
-//						pos_s = getFrenet(pos_x, pos_y, angle,
-//															map_waypoints_x, map_waypoints_y)[0];
+            pos_s = end_path_s;*/
+						pos_s = getFrenet(pos_x, pos_y, angle,
+															map_waypoints_x, map_waypoints_y)[0];
+						pos_x = previous_path_x[0];
+						pos_y = previous_path_y[0];
 
+						double pos_x2 = previous_path_x[1];
+            double pos_y2 = previous_path_y[1];
+						angle = atan2(pos_y2 - pos_y, pos_x2 - pos_x);
+						pos_s = getFrenet(pos_x, pos_y, angle,
+															map_waypoints_x, map_waypoints_y)[0];
 					}
 
 					// Predict with dynamics or not?
@@ -470,7 +469,7 @@ int main() {
 					vector<double> d_dot_start, d_ddot_start;
 
 					// JMT
-					double T = 2;
+					double T = 1;
 					vector<double> s_end, d_end;
 					// To mps
 					car_speed *= 0.44704;
@@ -479,13 +478,17 @@ int main() {
 																								car_speed * sin(car_yaw));
 
 					int lane = 1;
+					double t_inc = 0.02;
+					double s_inc;
+
 					if (path_size == 0) {
 						s_start = {pos_s, 0, 0};
 						// Middle lane
 						d_start = {6, 0, 0};
-						s_end = {pos_s + 20, 20, 0};
+						s_end = {pos_s + 15, 20, 0};
 						d_end = {6, 0, 0};
 					} else {
+						// TODO: something wrong with the start, end estimation
 						// differentiate previous JMT
 						/*s_dot_start = Utils.differentiate(prev_JMT_s_coeffs);
             s_ddot_start = Utils.differentiate(s_dot_start);
@@ -493,15 +496,21 @@ int main() {
 						d_dot_start = Utils.differentiate(prev_JMT_d_coeffs);
 						d_ddot_start = Utils.differentiate(d_dot_start);
 
-            s_start = {pos_s, s_dot_start[4], s_ddot_start[3]};
-            d_start = {6, d_dot_start[4], d_ddot_start[3]};*/
+						double init_velo = Utils.evaluate_function(s_dot_start, 0);
+						double init_acc = Utils.evaluate_function(s_ddot_start, 0);
+            s_start = {pos_s, init_velo, init_acc};
+            d_start = {6, 0, 0};
 
+						// Using previous JMT to estimate final location
+
+            s_end = {pos_s + init_velo * T/t_inc, 20, 0};
+						d_end = {6, 0, 0};*/
 						// TODO: my ego speed is not right
 						s_start = {pos_s, s_diff * 50 , 0};
 						d_start = {6, 0, 0};
 
 						cout << "ego speed vs: " << ego_vs_vd[0] << endl;
-						s_end = {pos_s + s_diff * 50 * 2, 20, 0};
+						s_end = {pos_s + s_diff * 50 * T, 20, 0};
 						d_end = {6, 0, 0};
 					}
 
@@ -511,26 +520,40 @@ int main() {
 					prev_JMT_s_coeffs = s_coeffs;
 					prev_JMT_d_coeffs = d_coeffs;
 
-					for (int i = 0; i < path_size; i+=1) {
-						next_x_vals.push_back(previous_path_x[i]);
-						next_y_vals.push_back(previous_path_y[i]);
+//					for (int i = 0; i < path_size; i+=1) {
+//						next_x_vals.push_back(previous_path_x[i]);
+//						next_y_vals.push_back(previous_path_y[i]);
+//					}
+
+//					if (path_size == 0) {
+						next_x_vals.push_back(pos_x);
+						next_y_vals.push_back(pos_y);
+//					}
+
+          vector<double> container_next;
+
+/*					next_x_vals.push_back(last_x);
+					next_y_vals.push_back(last_y);*/
+//					for (int i = 1; i < 50 - path_size; i+=1) {
+					for (int i = 1; i < 50; i+=1) {
+						container = getTargetXY(pos_s + s_diff * (i), 1, wp_sp);
+						container_next = getTargetXY(pos_s + s_diff * (i + 1), 1, wp_sp);
+            next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
+						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
+//						next_x_vals.push_back(container[0]);
+//						next_y_vals.push_back(container[1]);
 					}
 
-					for (int i = 0; i < 100 - path_size; i+=1) {
-						container = getTargetXY(pos_s + s_diff * (i + 1), 1, wp_sp);
-            next_x_vals.push_back(container[0]);
-						next_y_vals.push_back(container[1]);
-					}
 
-					double t_inc = 0.02;
-					double s_inc;
-          for (auto i = 0; i < T/t_inc; i+=1) {
-						s_inc = Utils.evalute_function(s_coeffs, t_inc * (i + 1));
+/*          for (auto i = 0; i < T/t_inc - path_size; i+=1) {
+						s_inc = Utils.evaluate_function(s_coeffs, t_inc * (i + 1));
 						container = getTargetXY(s_inc, lane, wp_sp);
 						cout << "s_inc:" << s_inc << endl;
 						cout << "x: " << container[0] << endl;
 						cout << "y: " << container[1] << endl;
-					}
+            next_x_vals.push_back(container[0]);
+						next_y_vals.push_back(container[1]);
+					}*/
 
           cout << "path size: " << path_size << endl;
           cout << "end of packets <<<<<<<<<< " << endl;

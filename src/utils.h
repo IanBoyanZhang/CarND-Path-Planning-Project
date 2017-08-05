@@ -58,7 +58,7 @@ public:
   vector<function<double(double)> >
   get_f_and_N_derivatitves(const vector<double>& coeffs);
 
-  double evalute_function(const vector<double>& coeffs, double x);
+  double evaluate_function(const vector<double>& coeffs, double x);
 };
 
 

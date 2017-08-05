@@ -91,7 +91,7 @@ utils::get_f_and_N_derivatitves(const vector<double>& coeffs) {
   return functions;
 }
 
-double utils::evalute_function(const vector<double> &coeffs, double x) {
+double utils::evaluate_function(const vector<double> &coeffs, double x) {
   double sum = 0;
   for (auto i = 0; i < coeffs.size(); i+=1) {
     sum += coeffs[i] * pow(x, i);
