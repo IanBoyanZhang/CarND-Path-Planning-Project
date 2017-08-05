@@ -417,25 +417,12 @@ int main() {
 
 					int path_size = previous_path_x.size();
 
-//          if (path_size != 0) {
-//						path_size = 10;
-//					}
-
 					if(path_size == 0) {
 						pos_x = car_x;
 						pos_y = car_y;
 						angle = deg2rad(car_yaw);
             pos_s = car_s;
 					} else {
-/*						pos_x = previous_path_x[path_size - 1];
-						pos_y = previous_path_y[path_size - 1];
-
-						double pos_x2 = previous_path_x[path_size - 2];
-						double pos_y2 = previous_path_y[path_size - 2];
-            // Which one is right?
-						angle = atan2(pos_y2 - pos_y, pos_x2 - pos_x);
-						// angle = deg2rad(car_yaw);
-            pos_s = end_path_s;*/
 						pos_s = getFrenet(pos_x, pos_y, angle,
 															map_waypoints_x, map_waypoints_y)[0];
 						pos_x = previous_path_x[0];
@@ -454,10 +441,6 @@ int main() {
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
-
-/*					cout << "pos_s" << pos_s << endl;
-					cout << "pos_x" << pos_x << endl;
-					cout << "pos_y" << pos_y << endl;*/
 
 					wp_sp = fitXY(pos_s, map_waypoints_s,
 												map_waypoints_x, map_waypoints_y,
@@ -520,28 +503,17 @@ int main() {
 					prev_JMT_s_coeffs = s_coeffs;
 					prev_JMT_d_coeffs = d_coeffs;
 
-//					for (int i = 0; i < path_size; i+=1) {
-//						next_x_vals.push_back(previous_path_x[i]);
-//						next_y_vals.push_back(previous_path_y[i]);
-//					}
 
-//					if (path_size == 0) {
-						next_x_vals.push_back(pos_x);
-						next_y_vals.push_back(pos_y);
-//					}
+					next_x_vals.push_back(pos_x);
+					next_y_vals.push_back(pos_y);
 
           vector<double> container_next;
 
-/*					next_x_vals.push_back(last_x);
-					next_y_vals.push_back(last_y);*/
-//					for (int i = 1; i < 50 - path_size; i+=1) {
 					for (int i = 1; i < 50; i+=1) {
 						container = getTargetXY(pos_s + s_diff * (i), 1, wp_sp);
 						container_next = getTargetXY(pos_s + s_diff * (i + 1), 1, wp_sp);
             next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
-//						next_x_vals.push_back(container[0]);
-//						next_y_vals.push_back(container[1]);
 					}
 
 
