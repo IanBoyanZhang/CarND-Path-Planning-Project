@@ -15,18 +15,18 @@
 
 using namespace std;
 
-
-vector<double> _get_vs_vd(const vector<double> d_norm,
-           const double vx, const double vy) {
-  double dx = d_norm[0];
-  double dy = d_norm[1];
+vector<double> _get_vs_vd(const double s, const double car_speed,
+													const double car_yaw, const tk::spline wp_sp_x,
+													const tk::spline wp_sp_y) {
 
   // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
-  double theta = atan2(vy, vx) - atan2(-dx, dy);
+	double s_diff = 0.3;
+	double lane_heading = atan2(wp_sp_y(s + s_diff) - wp_sp_y(s),
+															wp_sp_x(s + s_diff) - wp_sp_x(s));
+  double theta = car_yaw - lane_heading;
 
-  double vd = vy * cos(theta) + vx * sin(theta);
-  double vs = -vy * sin(theta) + vx * cos(theta);
-
+	double vs = car_speed * cos(theta);
+	double vd = car_speed * sin(theta);
   return {vs, vd};
 }
 
@@ -395,8 +395,6 @@ int main() {
 					vector<double> next_y_vals;
 
           // CAR_SPEED returned as mps
-//          cout << "car_speed: " << car_speed << endl;
-
 					if (!initialized) {
 						auto dt = 0;
             t_begin = chrono::high_resolution_clock::now();
@@ -437,7 +435,7 @@ int main() {
 
 					// Predict with dynamics or not?
 					// Sample coordinate transform
-          double s_diff = 0.30;
+          double s_diff = 0.42;
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
@@ -456,9 +454,6 @@ int main() {
 					vector<double> s_end, d_end;
 					// To mps
 					car_speed *= 0.44704;
-					vector<double> ego_vs_vd = _get_vs_vd({wp_sp[2](pos_s), wp_sp[3](pos_s)},
-																								car_speed * cos(car_yaw),
-																								car_speed * sin(car_yaw));
 
 					int lane = 1;
 					double t_inc = 0.02;
@@ -473,7 +468,7 @@ int main() {
 					} else {
 						// TODO: something wrong with the start, end estimation
 						// differentiate previous JMT
-						/*s_dot_start = Utils.differentiate(prev_JMT_s_coeffs);
+						s_dot_start = Utils.differentiate(prev_JMT_s_coeffs);
             s_ddot_start = Utils.differentiate(s_dot_start);
 
 						d_dot_start = Utils.differentiate(prev_JMT_d_coeffs);
@@ -484,17 +479,25 @@ int main() {
             s_start = {pos_s, init_velo, init_acc};
             d_start = {6, 0, 0};
 
+/*						cout << "prev_ " << prev_JMT_s_coeffs[0] << endl;
+						cout << "prev_ " << prev_JMT_s_coeffs[1] << endl;
+						cout << "prev_ " << prev_JMT_s_coeffs[2] << endl;
+						cout << "prev_ " << prev_JMT_s_coeffs[3] << endl;
+						cout << "prev_ " << prev_JMT_s_coeffs[4] << endl;
+						cout << "prev_ " << prev_JMT_s_coeffs[5] << endl;
+						cout << "init_velo: " << init_velo << endl;
+            cout << "init_acc: " << init_acc << endl;*/
 						// Using previous JMT to estimate final location
 
             s_end = {pos_s + init_velo * T/t_inc, 20, 0};
-						d_end = {6, 0, 0};*/
+						d_end = {6, 0, 0};
 						// TODO: my ego speed is not right
-						s_start = {pos_s, s_diff * 50 , 0};
+						/*s_start = {pos_s, s_diff * 50 , 0};
 						d_start = {6, 0, 0};
 
 						cout << "ego speed vs: " << ego_vs_vd[0] << endl;
 						s_end = {pos_s + s_diff * 50 * T, 20, 0};
-						d_end = {6, 0, 0};
+						d_end = {6, 0, 0};*/
 					}
 
 					vector<double> s_coeffs = Ptg.JMT(s_start, s_end, T);
@@ -503,6 +506,11 @@ int main() {
 					prev_JMT_s_coeffs = s_coeffs;
 					prev_JMT_d_coeffs = d_coeffs;
 
+          vector<double> ego_vs_vd = _get_vs_vd(pos_s, car_speed, car_yaw,
+																								wp_sp[0], wp_sp[1]);
+
+					cout << "VS: " << ego_vs_vd[0] << endl;
+					cout << "VD: " << ego_vs_vd[1] << endl;
 
 					next_x_vals.push_back(pos_x);
 					next_y_vals.push_back(pos_y);
@@ -516,16 +524,10 @@ int main() {
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
 					}
 
-
-/*          for (auto i = 0; i < T/t_inc - path_size; i+=1) {
+          for (auto i = 0; i < T/t_inc - path_size; i+=1) {
 						s_inc = Utils.evaluate_function(s_coeffs, t_inc * (i + 1));
 						container = getTargetXY(s_inc, lane, wp_sp);
-						cout << "s_inc:" << s_inc << endl;
-						cout << "x: " << container[0] << endl;
-						cout << "y: " << container[1] << endl;
-            next_x_vals.push_back(container[0]);
-						next_y_vals.push_back(container[1]);
-					}*/
+					}
 
           cout << "path size: " << path_size << endl;
           cout << "end of packets <<<<<<<<<< " << endl;
