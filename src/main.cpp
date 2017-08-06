@@ -248,15 +248,15 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 		wp_y.push_back(maps_y[wp_id]);
 		// For better numerically stability
 		// wp_dx.push_back(maps_dx[wp_id]);
-		wp_dx.push_back(maps_dx[wp_id] * 1000);
+		wp_dx.push_back(maps_dx[wp_id]);
 		// wp_dy.push_back(maps_dy[wp_id]);
-		wp_dy.push_back(maps_dy[wp_id] * 1000);
+		wp_dy.push_back(maps_dy[wp_id]);
 	}
 
 	// Sort for dealing with track wrap around
 	// TODO: smooth transition using relative distance
 
-	// TODO: Wrapping around inconsitancy is still an issue
+	// TODO: Wrapping around inconsitancy is still an issue?
   auto p = sort_permutation(wp_s, less<double>());
 
 	wp_s = apply_permutation(wp_s, p);
@@ -277,7 +277,50 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	return {wp_sp_x, wp_sp_y, wp_sp_dx, wp_sp_dy};
 }
 
-vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::spline> wp_sp) {
+/*****************************************************************
+ * Coordinate transformation
+ *****************************************************************/
+vector<double> mapXY2localXY(const double map_x, const double map_y,
+														 const double car_x, const double car_y, const double yaw)
+{
+	double x = map_x - car_x;
+	double y = map_y - car_y;
+
+	return {x * cos(yaw) + y * sin(yaw),
+					-x * sin(yaw) + y * cos(yaw)};
+}
+
+vector<double> localXY2mapXY(const double car_x, const double car_y,
+														 const double l_x, const double l_y, const double yaw){
+	return {l_x * cos(yaw) - l_y * sin(yaw) + car_x,
+					l_y * sin(yaw) + l_y * cos(yaw) + car_y};
+}
+
+/*vector<tk::spline> fitXYLocalCart(const double x, const double y, const double theta, const double s, const vector<double> maps_x,
+const vector<double> maps_y, const vector<double> maps_dx, vector<double>maps_dy,
+																	const double max_s) {
+  int closest_wp = NextWaypoint(x, y, theta, maps_x, maps_y);
+	int map_size = maps_x.size();
+
+	vector<double> wp_local;
+
+  vector<double> wp_segments_x;
+	vector<double> wp_segments_y;
+	int wp_id = -1;
+  for (int i = -10; i < 15; i+=1) {
+		wp_id = (wp_id + i) % map_size;
+
+		if (wp_id < 0) {
+			wp_id += map_size;
+		}
+		// Evaluate relative to car pose
+    wp_local = mapXY2localXY(maps_x[wp_id], maps_y[wp_id], x, y, theta);
+		wp_segments_x.push_back(wp_local[0]);
+		wp_segments_y.push_back(wp_local[1]);
+	}
+}*/
+
+vector<double> getTargetXY(const double pos_s, double d, const vector<tk::spline> wp_sp) {
 	const int LANE_WIDTH = 4;
 	tk::spline wp_sp_x = wp_sp[0];
 	tk::spline wp_sp_y = wp_sp[1];
@@ -292,10 +335,10 @@ vector<double> getTargetXY(const double pos_s, const int lane, const vector<tk::
 	/**
 	 * lane = 0, 1, 2
 	 */
-	const int d = 2 + lane * 4;
+//	const int d = 2 + lane * 4;
 
 	//return {x + d * dx/1000, y + d * dy/1000};
-	return {x + d * dx/1000, y + d * dy/1000};
+	return {x + d * dx, y + d * dy};
 }
 
 
@@ -413,6 +456,7 @@ int main() {
 					double angle;
 					double pos_s;
 
+					double nums_step = 50;
 					int path_size = previous_path_x.size();
 
 					if(path_size == 0) {
@@ -421,8 +465,6 @@ int main() {
 						angle = deg2rad(car_yaw);
             pos_s = car_s;
 					} else {
-						pos_s = getFrenet(pos_x, pos_y, angle,
-															map_waypoints_x, map_waypoints_y)[0];
 						pos_x = previous_path_x[0];
 						pos_y = previous_path_y[0];
 
@@ -434,7 +476,7 @@ int main() {
 					}
 
 					// Predict with dynamics or not?
-					// Sample coordinate transform
+          // ~ 48mph
           double s_diff = 0.42;
 					vector<double> container;
 
@@ -445,88 +487,17 @@ int main() {
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
 
-					vector<double> s_start, d_start;
-					vector<double> s_dot_start, s_ddot_start;
-					vector<double> d_dot_start, d_ddot_start;
-
-					// JMT
-					double T = 1;
-					vector<double> s_end, d_end;
-					// To mps
-					car_speed *= 0.44704;
-
-					int lane = 1;
-					double t_inc = 0.02;
-					double s_inc;
-
-					if (path_size == 0) {
-						s_start = {pos_s, 0, 0};
-						// Middle lane
-						d_start = {6, 0, 0};
-						s_end = {pos_s + 15, 20, 0};
-						d_end = {6, 0, 0};
-					} else {
-						// TODO: something wrong with the start, end estimation
-						// differentiate previous JMT
-						s_dot_start = Utils.differentiate(prev_JMT_s_coeffs);
-            s_ddot_start = Utils.differentiate(s_dot_start);
-
-						d_dot_start = Utils.differentiate(prev_JMT_d_coeffs);
-						d_ddot_start = Utils.differentiate(d_dot_start);
-
-						double init_velo = Utils.evaluate_function(s_dot_start, 0);
-						double init_acc = Utils.evaluate_function(s_ddot_start, 0);
-            s_start = {pos_s, init_velo, init_acc};
-            d_start = {6, 0, 0};
-
-/*						cout << "prev_ " << prev_JMT_s_coeffs[0] << endl;
-						cout << "prev_ " << prev_JMT_s_coeffs[1] << endl;
-						cout << "prev_ " << prev_JMT_s_coeffs[2] << endl;
-						cout << "prev_ " << prev_JMT_s_coeffs[3] << endl;
-						cout << "prev_ " << prev_JMT_s_coeffs[4] << endl;
-						cout << "prev_ " << prev_JMT_s_coeffs[5] << endl;
-						cout << "init_velo: " << init_velo << endl;
-            cout << "init_acc: " << init_acc << endl;*/
-						// Using previous JMT to estimate final location
-
-            s_end = {pos_s + init_velo * T/t_inc, 20, 0};
-						d_end = {6, 0, 0};
-						// TODO: my ego speed is not right
-						/*s_start = {pos_s, s_diff * 50 , 0};
-						d_start = {6, 0, 0};
-
-						cout << "ego speed vs: " << ego_vs_vd[0] << endl;
-						s_end = {pos_s + s_diff * 50 * T, 20, 0};
-						d_end = {6, 0, 0};*/
-					}
-
-					vector<double> s_coeffs = Ptg.JMT(s_start, s_end, T);
-					vector<double> d_coeffs = Ptg.JMT(d_start, d_end, T);
-
-					prev_JMT_s_coeffs = s_coeffs;
-					prev_JMT_d_coeffs = d_coeffs;
-
-          vector<double> ego_vs_vd = _get_vs_vd(pos_s, car_speed, car_yaw,
-																								wp_sp[0], wp_sp[1]);
-
-					cout << "VS: " << ego_vs_vd[0] << endl;
-					cout << "VD: " << ego_vs_vd[1] << endl;
-
-					next_x_vals.push_back(pos_x);
-					next_y_vals.push_back(pos_y);
+          // Proposed Horizon
+					next_x_vals.push_back(car_x);
+					next_y_vals.push_back(car_y);
 
           vector<double> container_next;
 
-					for (int i = 1; i < 50; i+=1) {
-						container = getTargetXY(pos_s + s_diff * (i), 1, wp_sp);
-						container_next = getTargetXY(pos_s + s_diff * (i + 1), 1, wp_sp);
+					for (int i = 1; i < nums_step; i+=1) {
+						container = getTargetXY(car_s + s_diff * (i), car_d, wp_sp);
+						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d, wp_sp);
             next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
-					}
-
-          for (auto i = 0; i < T/t_inc - path_size; i+=1) {
-						s_inc = Utils.evaluate_function(s_coeffs, t_inc * (i + 1));
-						container = getTargetXY(s_inc, lane, wp_sp);
 					}
 
           cout << "path size: " << path_size << endl;
