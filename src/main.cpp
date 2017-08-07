@@ -256,7 +256,7 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	// Sort for dealing with track wrap around
 	// TODO: smooth transition using relative distance
 
-	// TODO: Wrapping around inconsitancy is still an issue?
+	// TODO: Wrapping around inconsistancy is still an issue?
   auto p = sort_permutation(wp_s, less<double>());
 
 	wp_s = apply_permutation(wp_s, p);
@@ -390,6 +390,10 @@ int main() {
   	map_waypoints_s.push_back(s);
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
+
+    // TODO: create a continuous velocity profile
+
+
   }
 
   h.onMessage([&max_s, &initialized, &t_begin, &Ptg, &Utils,
@@ -450,14 +454,26 @@ int main() {
 						// cout << "time difference: " << dt << endl;
 					}
 
+					int path_size = previous_path_x.size();
+
+					int nums_step = 50;
+					// ~ 49.5mph
+					const double s_diff = 0.43;
+//					vector<double> t;
+//					vector<double> dist_inc;
+
+//					t = {-1, 10, 15, 25, 35, (double)nums_step};
+//					dist_inc = {s_diff * 0.6, s_diff * 0.7, s_diff * 0.8,
+//											s_diff * 0.9, s_diff * 0.95, s_diff};
+
+//					tk::spline smooth_speed;
+//					smooth_speed.set_points(t, dist_inc);
+
 					// Init condition
 					double pos_x;
 					double pos_y;
 					double angle;
 					double pos_s;
-
-					double nums_step = 50;
-					int path_size = previous_path_x.size();
 
 					if(path_size == 0) {
 						pos_x = car_x;
@@ -476,8 +492,7 @@ int main() {
 					}
 
 					// Predict with dynamics or not?
-          // ~ 48mph
-          double s_diff = 0.42;
+
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
@@ -487,18 +502,56 @@ int main() {
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
 
-          // Proposed Horizon
+          // Proposed start Horizon
 					next_x_vals.push_back(car_x);
 					next_y_vals.push_back(car_y);
 
           vector<double> container_next;
-
+					double x_diff, y_diff;
+					vector<double> x_diff_vec, y_diff_vec;
+					double step_dist;
+          double d_inc = 0;
 					for (int i = 1; i < nums_step; i+=1) {
+
+						if (car_d - 2 < 0.5) {
+							d_inc = 0;
+						} else {
+							d_inc = -0.01;
+						}
 						container = getTargetXY(car_s + s_diff * (i), car_d, wp_sp);
-						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d, wp_sp);
+						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d + d_inc, wp_sp);
+//						container = getTargetXY(car_s + smooth_speed(i), car_d, wp_sp);
+//						container_next = getTargetXY(car_s + smooth_speed(i + 1), car_d, wp_sp);
+						// log
+//						x_diff = container_next[0] - container[0];
+//						y_diff = container_next[1] - container[1];
+						cout << "abs car_d: " << car_d << endl;
+
+//						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
             next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
+//            next_x_vals.push_back(container[0]);
+//						next_y_vals.push_back(container[1]);
+//            x_diff_vec.push_back(x_diff);
+//						y_diff_vec.push_back(y_diff);
 					}
+
+					// do another smoothing
+					// auto p = sort_permutation(x_diff_vec, less<double>());
+					// x_diff_vec = apply_permutation(x_diff_vec, p);
+					// y_diff_vec = apply_permutation(y_diff_vec, p);
+
+//          for (auto i = 0; i < nums_step; i+=1) {
+
+//					}
+
+//					tk::spline xy_diff_sp;
+//          xy_diff_sp.set_points(x_diff_vec, y_diff_vec);
+
+//					for (int i = 1; i < nums_step; i+=1) {
+//						next_x_vals.push_back(next_x_vals[i - 1] + x_diff_vec[i - 1]);
+//						next_y_vals.push_back(next_y_vals[i - 1] + xy_diff_sp(x_diff_vec[i - 1]));
+//					}
 
           cout << "path size: " << path_size << endl;
           cout << "end of packets <<<<<<<<<< " << endl;
