@@ -459,15 +459,6 @@ int main() {
 					int nums_step = 50;
 					// ~ 49.5mph
 					const double max_s_diff = 0.43;
-//					vector<double> t;
-//					vector<double> dist_inc;
-
-//					t = {-1, 10, 15, 25, 35, (double)nums_step};
-//					dist_inc = {s_diff * 0.6, s_diff * 0.7, s_diff * 0.8,
-//											s_diff * 0.9, s_diff * 0.95, s_diff};
-
-//					tk::spline smooth_speed;
-//					smooth_speed.set_points(t, dist_inc);
 
 					// Init condition
 					double pos_x;
@@ -519,7 +510,6 @@ int main() {
 					double d_inc = step_dist/200;
 
 					// Refining dt with real time calc?
-
           // TODO: calculate speed difference in Cartesian to clamp speed
 					// and acceleration and jerk
 					double dt = 0.02;
@@ -532,12 +522,24 @@ int main() {
           /******************
            * Speed control
            ******************/
-					double vs_step = 0.001;
 					double car_vs = car_speed * 0.44704/50;
+					int consumered_steps = 0;
+					if (path_size == 0) {
+						consumered_steps = 3;
+					} else {
+						consumered_steps = nums_step - path_size;
+					}
+
+          double T = 1;
+          vector<double> s_end = {car_s + car_vs * nums_step, 0.37, 0};
+					vector<double> s_start = {car_s, car_vs, 0};
+
+					vector<double> jmt_params = Ptg.JMT(s_start, s_end, T);
+          double jmt_0, jmt_1;
+
 
           cout << "car_vs from car_speed: " << car_vs << endl;
 					car_vs = max_s_diff;
-
 					for (int i = 1; i < nums_step; i+=1) {
 						// Regarding CTE
 						// Seems right now the P controller works pretty well
@@ -560,11 +562,21 @@ int main() {
 							}
 						}
 						// D term
-            d_inc_diff = d_inc - prev_d_inc;
             next_car_d += d_inc;
+						//------------------------------------
+            // S_control
+						//------------------------------------
+//            cout << "JMT S(dt*i): " << Utils.evaluate_function(jmt_params, dt * i) << endl;
+						jmt_0 = Utils.evaluate_function(jmt_params, dt * i);
+						jmt_1 = Utils.evaluate_function(jmt_params, dt * (i + 1));
 
 						container = getTargetXY(car_s + car_vs * (i), car_d + d_inc * (i), wp_sp);
 						container_next = getTargetXY(car_s + car_vs * (i + 1), car_d + d_inc * (i + 1), wp_sp);
+
+						cout << "jmt_diff: " << jmt_1 - jmt_0 << endl;
+//						container = getTargetXY(jmt_0, car_d + d_inc * (i), wp_sp);
+//						container_next = getTargetXY(jmt_1 * (i + 1), car_d + d_inc * (i + 1), wp_sp);
+
 						// log
 //						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
             next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
