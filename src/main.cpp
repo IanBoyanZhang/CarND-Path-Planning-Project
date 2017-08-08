@@ -531,12 +531,14 @@ int main() {
           double d_inc_diff = 0;
 					for (int i = 1; i < nums_step; i+=1) {
 						// Regarding CTE
+						// Seems right now the P controller works pretty well
+						// Maybe something like averaged p controller?
+						// on control input over 20 steps?
 						// PID CTE ?
             // TODO: better PID
 						// Keep lane
 
 						// Predicted vehicle location of CTE using projected dynamics
-            // cte = car_d + d_inc * i - 10;
 						cte = next_car_d - 10;
 						// P term
             if (abs(cte) > 0.1 && abs(cte) < 0.7) {
@@ -555,8 +557,6 @@ int main() {
 						cout << "d_inc_diff: " << d_inc_diff << endl;
             next_car_d += d_inc;
 
-						// D diffe
-
 						container = getTargetXY(car_s + s_diff * (i), car_d + d_inc * (i), wp_sp);
 						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d + d_inc * (i + 1), wp_sp);
 						// log
@@ -570,26 +570,8 @@ int main() {
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
 					}
 
-					// do another smoothing
-					// auto p = sort_permutation(x_diff_vec, less<double>());
-					// x_diff_vec = apply_permutation(x_diff_vec, p);
-					// y_diff_vec = apply_permutation(y_diff_vec, p);
-
-//          for (auto i = 0; i < nums_step; i+=1) {
-
-//					}
-
-//					tk::spline xy_diff_sp;
-//          xy_diff_sp.set_points(x_diff_vec, y_diff_vec);
-
-//					for (int i = 1; i < nums_step; i+=1) {
-//						next_x_vals.push_back(next_x_vals[i - 1] + x_diff_vec[i - 1]);
-//						next_y_vals.push_back(next_y_vals[i - 1] + xy_diff_sp(x_diff_vec[i - 1]));
-//					}
-
           cout << "path size: " << path_size << endl;
           cout << "end of packets <<<<<<<<<< " << endl;
-					// TODO: second filtering for stitching the path?
 
 					tk::spline prev_sp;
 					vector<double> prev_s;
