@@ -9,6 +9,7 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
 //#include "BehaviorPlanner.h"
+#include <limits>
 #include "spline.h"
 #include "PTG.h"
 #include "utils.h"
@@ -24,6 +25,10 @@ using namespace std;
 #define CAR_VY 4
 #define CAR_S 5
 #define CAR_D 6
+
+const int NUMS_OF_CARS = 12;
+const double SAME_LANE = 1;
+const double CLOSE_DISTANCE = 23;
 
 //vector<double> _get_vs_vd(const double s, const double car_speed,
 //													const double car_yaw, const tk::spline wp_sp_x,
@@ -47,7 +52,6 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
-
 
 
 // Checks if the SocketIO event has JSON data.
@@ -353,7 +357,27 @@ vector<double> getTargetXY(const double pos_s, double d, const vector<tk::spline
 	return {x + d * dx, y + d * dy};
 }
 
+// For now, only consider the front vehicle
+int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
+														 const double car_s , const double car_d) {
 
+	double closest_to_front = numeric_limits<double>::max();
+	double front_distance = 0;
+	int min_id = 0;
+	double other_car_d;
+	for (int i = 0; i < NUMS_OF_CARS; i+=1) {
+		other_car_d = sensor_fusion[i][CAR_D];
+		if (other_car_d < 0) { continue; }
+		if (abs(other_car_d - car_d) > SAME_LANE) { continue; }
+		front_distance = sensor_fusion[i][CAR_S] - car_s;
+		if (front_distance < 0) { continue; }
+    if (front_distance < closest_to_front) {
+			closest_to_front = front_distance;
+			min_id = i;
+		}
+	}
+	return min_id;
+}
 
 int main() {
   uWS::Hub h;
@@ -469,7 +493,7 @@ int main() {
 
 					int nums_step = 50;
 					// ~ 49.5mph
-					const double max_s_diff = 0.43;
+					const double max_s_diff = 0.427;
 
 					// Init condition
 					double pos_x;
@@ -539,6 +563,7 @@ int main() {
 						car_vs = 0;
 					} else {
 						consumered_steps = nums_step - path_size;
+						// Happen to be the very next timestamp
 						car_vs = VS[consumered_steps];
 					}
 
@@ -547,13 +572,32 @@ int main() {
            * To follow single line, going straight, just slowing down
            * 1. check collision in front
            * 2. figure out the right speed
+           *
+           * sensor[id][0, 1, 2...]
            ********************/
 
-					for (int i = 0; i < sensor_fusion.size(); i+=1) {
-						cout << "Number of Vehicles: " << sensor_fusion[i][0] << endl;
-					}
+          double car_vx, car_vy;
+/*					for (int i = 0; i < sensor_fusion.size(); i+=1) {
+						car_vx = sensor_fusion[i][CAR_VX];
+            car_vy = sensor_fusion[i][CAR_VY];
+						cout << "VX " << sensor_fusion[i][CAR_VX] << endl;
+            cout << "VY " << sensor_fusion[i][CAR_VY] << endl;
+            cout << "Speed in global" << sqrt(pow(car_vx, 2) + pow(car_vy, 2)) << endl;
+					}*/
 
-          double target_vs = 0.37;
+					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
+          double closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+					car_vx = sensor_fusion[closest_id][CAR_VX];
+					car_vy = sensor_fusion[closest_id][CAR_VY];
+					double target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
+					cout << "Closest distance: " << closest_front << endl;
+					cout << "Velocity: " << target_velocity << endl;
+
+					double target_vs = max_s_diff;
+					if (closest_front < CLOSE_DISTANCE) {
+						target_vs = target_velocity * .44704/50;
+					}
+          cout << "target_vs: " << target_vs << endl;
 					cout << "car_vs from precalculated: " << car_vs << endl;
 
 					double s_error = 0;
@@ -594,12 +638,12 @@ int main() {
 							car_vs -= vs_diff;
 						}
 
-            if (car_vs > max_s_diff) {
-							car_vs = max_s_diff;
-						}
+//            if (car_vs > max_s_diff - 0.04) {
+//							car_vs = max_s_diff;
+//						}
 
 						VS.push_back(car_vs);
-            cout << "car_vs: " << car_vs << endl;
+//            cout << "car_vs: " << car_vs << endl;
 						container = getTargetXY(car_s + car_vs * (i), car_d + d_inc * (i), wp_sp);
 						container_next = getTargetXY(car_s + car_vs * (i + 1), car_d + d_inc * (i + 1), wp_sp);
 
