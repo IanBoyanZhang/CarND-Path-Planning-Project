@@ -509,31 +509,65 @@ int main() {
           vector<double> container_next;
 					double x_diff, y_diff;
 					vector<double> x_diff_vec, y_diff_vec;
-					double step_dist;
-          double d_inc = 0;
-					for (int i = 1; i < nums_step; i+=1) {
+					// Changing lane movement
+					double d_start = car_d;
+					// Change to left lane
+					double d_end = 2;
 
-						if (car_d - 2 < 0.5) {
-							d_inc = 0;
-						} else {
-							d_inc = -0.01;
+					double step_dist = 10 - car_d;
+					double d_inc = step_dist/200;
+
+					// Refining dt with real time calc?
+
+          // TODO: calculate speed difference in Cartesian to clamp speed
+					// and acceleration and jerk
+					double dt = 0.02;
+					double next_car_d = car_d;
+					// PID parameter
+					double PID_P = 0.01;
+          //
+//					double PID_D = 5e-4;
+					double cte = 0, prev_d_inc = 0;
+          double d_inc_diff = 0;
+					for (int i = 1; i < nums_step; i+=1) {
+						// Regarding CTE
+						// PID CTE ?
+            // TODO: better PID
+						// Keep lane
+
+						// Predicted vehicle location of CTE using projected dynamics
+            // cte = car_d + d_inc * i - 10;
+						cte = next_car_d - 10;
+						// P term
+            if (abs(cte) > 0.1 && abs(cte) < 0.7) {
+							d_inc = PID_P * (-cte);
+							if (abs(car_d - 2) > 30) {
+                car_d = 0;
+							}
 						}
-						container = getTargetXY(car_s + s_diff * (i), car_d, wp_sp);
-						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d + d_inc, wp_sp);
-//						container = getTargetXY(car_s + smooth_speed(i), car_d, wp_sp);
-//						container_next = getTargetXY(car_s + smooth_speed(i + 1), car_d, wp_sp);
+						// D term
+            d_inc_diff = d_inc - prev_d_inc;
+//            cout << "d_term: " << PID_D * pid_d_diff << endl;
+//						d_inc  += -PID_D * pid_d_diff;
+
+						prev_d_inc = cte;
+
+						cout << "d_inc_diff: " << d_inc_diff << endl;
+            next_car_d += d_inc;
+
+						// D diffe
+
+						container = getTargetXY(car_s + s_diff * (i), car_d + d_inc * (i), wp_sp);
+						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d + d_inc * (i + 1), wp_sp);
 						// log
 //						x_diff = container_next[0] - container[0];
 //						y_diff = container_next[1] - container[1];
-						cout << "abs car_d: " << car_d << endl;
+//            next_car_d =
+						cout << "abs car_d + d_inc: " << next_car_d << endl;
 
 //						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
             next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
-//            next_x_vals.push_back(container[0]);
-//						next_y_vals.push_back(container[1]);
-//            x_diff_vec.push_back(x_diff);
-//						y_diff_vec.push_back(y_diff);
 					}
 
 					// do another smoothing
