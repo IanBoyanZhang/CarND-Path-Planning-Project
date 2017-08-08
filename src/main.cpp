@@ -15,20 +15,20 @@
 
 using namespace std;
 
-vector<double> _get_vs_vd(const double s, const double car_speed,
-													const double car_yaw, const tk::spline wp_sp_x,
-													const tk::spline wp_sp_y) {
-
-  // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
-	double s_diff = 0.3;
-	double lane_heading = atan2(wp_sp_y(s + s_diff) - wp_sp_y(s),
-															wp_sp_x(s + s_diff) - wp_sp_x(s));
-  double theta = car_yaw - lane_heading;
-
-	double vs = car_speed * cos(theta);
-	double vd = car_speed * sin(theta);
-  return {vs, vd};
-}
+//vector<double> _get_vs_vd(const double s, const double car_speed,
+//													const double car_yaw, const tk::spline wp_sp_x,
+//													const tk::spline wp_sp_y) {
+//
+//  // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
+//	double s_diff = 0.3;
+//	double lane_heading = atan2(wp_sp_y(s + s_diff) - wp_sp_y(s),
+//															wp_sp_x(s + s_diff) - wp_sp_x(s));
+//  double theta = car_yaw - lane_heading;
+//
+//	double vs = car_speed * cos(theta);
+//	double vd = car_speed * sin(theta);
+//  return {vs, vd};
+//}
 
 // for convenience
 using json = nlohmann::json;
@@ -412,9 +412,9 @@ int main() {
 
       if (s != "") {
         auto j = json::parse(s);
-        
+
         string event = j[0].get<string>();
-        
+
         if (event == "telemetry") {
           // j[1] is the data JSON object
 
@@ -458,7 +458,7 @@ int main() {
 
 					int nums_step = 50;
 					// ~ 49.5mph
-					const double s_diff = 0.43;
+					const double max_s_diff = 0.43;
 //					vector<double> t;
 //					vector<double> dist_inc;
 
@@ -512,9 +512,10 @@ int main() {
 					// Changing lane movement
 					double d_start = car_d;
 					// Change to left lane
-					double d_end = 2;
+					int lane = 2;
+					double d_end = 2 + lane * 4;
 
-					double step_dist = 10 - car_d;
+					double step_dist = d_end - car_d;
 					double d_inc = step_dist/200;
 
 					// Refining dt with real time calc?
@@ -525,10 +526,18 @@ int main() {
 					double next_car_d = car_d;
 					// PID parameter
 					double PID_P = 0.01;
-          //
-//					double PID_D = 5e-4;
 					double cte = 0, prev_d_inc = 0;
           double d_inc_diff = 0;
+
+          /******************
+           * Speed control
+           ******************/
+					double vs_step = 0.001;
+					double car_vs = car_speed * 0.44704/50;
+
+          cout << "car_vs from car_speed: " << car_vs << endl;
+					car_vs = max_s_diff;
+
 					for (int i = 1; i < nums_step; i+=1) {
 						// Regarding CTE
 						// Seems right now the P controller works pretty well
@@ -539,8 +548,11 @@ int main() {
 						// Keep lane
 
 						// Predicted vehicle location of CTE using projected dynamics
-						cte = next_car_d - 10;
+						cte = next_car_d - d_end;
 						// P term
+            if (abs(cte) >= 0.7) {
+							d_inc = 0.01 * -cte;
+						}
             if (abs(cte) > 0.1 && abs(cte) < 0.7) {
 							d_inc = PID_P * (-cte);
 							if (abs(car_d - 2) > 30) {
@@ -549,22 +561,11 @@ int main() {
 						}
 						// D term
             d_inc_diff = d_inc - prev_d_inc;
-//            cout << "d_term: " << PID_D * pid_d_diff << endl;
-//						d_inc  += -PID_D * pid_d_diff;
-
-						prev_d_inc = cte;
-
-						cout << "d_inc_diff: " << d_inc_diff << endl;
             next_car_d += d_inc;
 
-						container = getTargetXY(car_s + s_diff * (i), car_d + d_inc * (i), wp_sp);
-						container_next = getTargetXY(car_s + s_diff * (i + 1), car_d + d_inc * (i + 1), wp_sp);
+						container = getTargetXY(car_s + car_vs * (i), car_d + d_inc * (i), wp_sp);
+						container_next = getTargetXY(car_s + car_vs * (i + 1), car_d + d_inc * (i + 1), wp_sp);
 						// log
-//						x_diff = container_next[0] - container[0];
-//						y_diff = container_next[1] - container[1];
-//            next_car_d =
-						cout << "abs car_d + d_inc: " << next_car_d << endl;
-
 //						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
             next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
 						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
