@@ -15,6 +15,16 @@
 
 using namespace std;
 
+// Constants
+//[ id, x, y, vx, vy, s, d]
+#define CAR_ID 0
+#define CAR_X 1
+#define CAR_Y 2
+#define CAR_VX 3
+#define CAR_VY 4
+#define CAR_S 5
+#define CAR_D 6
+
 //vector<double> _get_vs_vd(const double s, const double car_speed,
 //													const double car_yaw, const tk::spline wp_sp_x,
 //													const tk::spline wp_sp_y) {
@@ -37,6 +47,8 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+
+
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -499,9 +511,7 @@ int main() {
           vector<double> container_next;
 					double x_diff, y_diff;
 					vector<double> x_diff_vec, y_diff_vec;
-					// Changing lane movement
 					double d_start = car_d;
-					// Change to left lane
 					int lane = 2;
 					double d_end = 2 + lane * 4;
 
@@ -530,6 +540,17 @@ int main() {
 					} else {
 						consumered_steps = nums_step - path_size;
 						car_vs = VS[consumered_steps];
+					}
+
+          /********************
+           * Preliminary Behavior Planner
+           * To follow single line, going straight, just slowing down
+           * 1. check collision in front
+           * 2. figure out the right speed
+           ********************/
+
+					for (int i = 0; i < sensor_fusion.size(); i+=1) {
+						cout << "Number of Vehicles: " << sensor_fusion[i][0] << endl;
 					}
 
           double target_vs = 0.37;
