@@ -363,7 +363,7 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 
 	double closest_to_front = numeric_limits<double>::max();
 	double front_distance = 0;
-	int min_id = 0;
+	int min_id = -1;
 	double other_car_d;
 	for (int i = 0; i < NUMS_OF_CARS; i+=1) {
 		other_car_d = sensor_fusion[i][CAR_D];
@@ -378,6 +378,10 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 	}
 	return min_id;
 }
+
+/**************************************************
+ * COST FUNCTIONS
+ **************************************************/
 
 int main() {
   uWS::Hub h;
@@ -577,19 +581,20 @@ int main() {
            ********************/
 
           double car_vx, car_vy;
-/*					for (int i = 0; i < sensor_fusion.size(); i+=1) {
-						car_vx = sensor_fusion[i][CAR_VX];
-            car_vy = sensor_fusion[i][CAR_VY];
-						cout << "VX " << sensor_fusion[i][CAR_VX] << endl;
-            cout << "VY " << sensor_fusion[i][CAR_VY] << endl;
-            cout << "Speed in global" << sqrt(pow(car_vx, 2) + pow(car_vy, 2)) << endl;
-					}*/
 
 					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
-          double closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
-					car_vx = sensor_fusion[closest_id][CAR_VX];
-					car_vy = sensor_fusion[closest_id][CAR_VY];
-					double target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
+          double closest_front;
+					double target_velocity;
+					if (closest_id != -1) {
+						car_vx = sensor_fusion[closest_id][CAR_VX];
+						car_vy = sensor_fusion[closest_id][CAR_VY];
+            closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+						target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
+					} else {
+						closest_front = numeric_limits<double>::max();
+            target_velocity = 49;
+					}
+
 					cout << "Closest distance: " << closest_front << endl;
 					cout << "Velocity: " << target_velocity << endl;
 
