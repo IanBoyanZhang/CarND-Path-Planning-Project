@@ -532,7 +532,6 @@ int main() {
 						car_vs = VS[consumered_steps];
 					}
 
-//					car_vs = max_s_diff;
           double target_vs = 0.37;
 					cout << "car_vs from precalculated: " << car_vs << endl;
 
@@ -564,7 +563,7 @@ int main() {
 						// D term
             next_car_d += d_inc;
 						//------------------------------------
-            // S_control Feed forward
+            // S_control
 						//------------------------------------
 						s_error = car_vs - target_vs;
 
