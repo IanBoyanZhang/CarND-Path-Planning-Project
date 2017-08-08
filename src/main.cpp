@@ -390,15 +390,14 @@ int main() {
   	map_waypoints_s.push_back(s);
   	map_waypoints_dx.push_back(d_x);
   	map_waypoints_dy.push_back(d_y);
-
-    // TODO: create a continuous velocity profile
-
-
   }
+
+	vector<double> VS = {0};
 
   h.onMessage([&max_s, &initialized, &t_begin, &Ptg, &Utils,
 											&prev_JMT_s_coeffs,
 											&prev_JMT_d_coeffs,
+					&VS,
 											&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
                      uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -523,23 +522,24 @@ int main() {
            * Speed control
            ******************/
 					double car_vs = car_speed * 0.44704/50;
+					cout << "car_vs from car_speed: " << car_vs << endl;
 					int consumered_steps = 0;
 					if (path_size == 0) {
 						consumered_steps = 3;
+						car_vs = 0;
 					} else {
 						consumered_steps = nums_step - path_size;
+						car_vs = VS[consumered_steps];
 					}
 
-          double T = 1;
-          vector<double> s_end = {car_s + car_vs * nums_step, 0.37, 0};
-					vector<double> s_start = {car_s, car_vs, 0};
+//					car_vs = max_s_diff;
+          double target_vs = 0.37;
+					cout << "car_vs from precalculated: " << car_vs << endl;
 
-					vector<double> jmt_params = Ptg.JMT(s_start, s_end, T);
-          double jmt_0, jmt_1;
+					double s_error = 0;
+          double vs_diff = 0.001;
 
-
-          cout << "car_vs from car_speed: " << car_vs << endl;
-					car_vs = max_s_diff;
+          VS.clear();
 					for (int i = 1; i < nums_step; i+=1) {
 						// Regarding CTE
 						// Seems right now the P controller works pretty well
@@ -564,18 +564,24 @@ int main() {
 						// D term
             next_car_d += d_inc;
 						//------------------------------------
-            // S_control
+            // S_control Feed forward
 						//------------------------------------
-//            cout << "JMT S(dt*i): " << Utils.evaluate_function(jmt_params, dt * i) << endl;
-						jmt_0 = Utils.evaluate_function(jmt_params, dt * i);
-						jmt_1 = Utils.evaluate_function(jmt_params, dt * (i + 1));
+						s_error = car_vs - target_vs;
 
+            if(s_error < 0) {
+							car_vs += vs_diff;
+						} else {
+							car_vs -= vs_diff;
+						}
+
+            if (car_vs > max_s_diff) {
+							car_vs = max_s_diff;
+						}
+
+						VS.push_back(car_vs);
+            cout << "car_vs: " << car_vs << endl;
 						container = getTargetXY(car_s + car_vs * (i), car_d + d_inc * (i), wp_sp);
 						container_next = getTargetXY(car_s + car_vs * (i + 1), car_d + d_inc * (i + 1), wp_sp);
-
-						cout << "jmt_diff: " << jmt_1 - jmt_0 << endl;
-//						container = getTargetXY(jmt_0, car_d + d_inc * (i), wp_sp);
-//						container_next = getTargetXY(jmt_1 * (i + 1), car_d + d_inc * (i + 1), wp_sp);
 
 						// log
 //						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
