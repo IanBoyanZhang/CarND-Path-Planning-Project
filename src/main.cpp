@@ -30,6 +30,10 @@ const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
 
+struct target_distance_t {
+
+};
+
 //vector<double> _get_vs_vd(const double s, const double car_speed,
 //													const double car_yaw, const tk::spline wp_sp_x,
 //													const tk::spline wp_sp_y) {
@@ -380,8 +384,11 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 }
 
 /**************************************************
- * COST FUNCTIONS
+ * COST FUNCTIONS for Behaviour Planners
  **************************************************/
+double buffer_cost(double shortest_dist_in_mov) {
+
+}
 
 int main() {
   uWS::Hub h;
@@ -609,6 +616,10 @@ int main() {
           double vs_diff = 0.001;
 
           VS.clear();
+
+          /****************************
+           * Prediction loop
+           ****************************/
 					for (int i = 1; i < nums_step; i+=1) {
 						// Regarding CTE
 						// Seems right now the P controller works pretty well
@@ -617,6 +628,10 @@ int main() {
 						// PID CTE ?
             // TODO: better PID
 						// Keep lane
+
+						/**********************************
+						 * D_control
+						 **********************************/
 
 						// Predicted vehicle location of CTE using projected dynamics
 						cte = next_car_d - d_end;
@@ -643,10 +658,9 @@ int main() {
 							car_vs -= vs_diff;
 						}
 
-//            if (car_vs > max_s_diff - 0.04) {
-//							car_vs = max_s_diff;
-//						}
-
+            /*****************************************************
+             * Caching velocity prediction for next simulator loop
+             *****************************************************/
 						VS.push_back(car_vs);
 //            cout << "car_vs: " << car_vs << endl;
 						container = getTargetXY(car_s + car_vs * (i), car_d + d_inc * (i), wp_sp);
