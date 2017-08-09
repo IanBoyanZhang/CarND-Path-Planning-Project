@@ -26,6 +26,10 @@ using namespace std;
 #define CAR_S 5
 #define CAR_D 6
 
+#define P_CAR_ID 0
+#define P_CAR_X 1
+#define P_CAR_Y 2
+
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
@@ -34,20 +38,9 @@ struct target_distance_t {
 
 };
 
-//vector<double> _get_vs_vd(const double s, const double car_speed,
-//													const double car_yaw, const tk::spline wp_sp_x,
-//													const tk::spline wp_sp_y) {
-//
-//  // The reason for this is {dx, dy} will be interpolated from spline, dx^2 + dy^2 != 1
-//	double s_diff = 0.3;
-//	double lane_heading = atan2(wp_sp_y(s + s_diff) - wp_sp_y(s),
-//															wp_sp_x(s + s_diff) - wp_sp_x(s));
-//  double theta = car_yaw - lane_heading;
-//
-//	double vs = car_speed * cos(theta);
-//	double vd = car_speed * sin(theta);
-//  return {vs, vd};
-//}
+int whichLane(double d) {
+  return 0;
+}
 
 // for convenience
 using json = nlohmann::json;
@@ -371,7 +364,9 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 	double other_car_d;
 	for (int i = 0; i < NUMS_OF_CARS; i+=1) {
 		other_car_d = sensor_fusion[i][CAR_D];
-		if (other_car_d < 0) { continue; }
+    // Below may not be necessary it seems the simulator sends
+		// Only the same direction traveling vehicles
+//		if (other_car_d < 0) { continue; }
 		if (abs(other_car_d - car_d) > SAME_LANE) { continue; }
 		front_distance = sensor_fusion[i][CAR_S] - car_s;
 		if (front_distance < 0) { continue; }
@@ -383,12 +378,38 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 	return min_id;
 }
 
+// Generating prediction table for all
+// Design predicted table data structure
+// 3 dimensional data structure with T?
+vector<vector<double> > predict(const vector<vector<double> >& sensor_fusion,
+																				 double t_inc, double T, double car_x,
+																				 double car_y, double car_s, double car_d) {
+  vector< vector<double> > filtered;
+	// To achieve that
+	double x, y, vx, vy, s, d, id;
+  for (auto i = 0; i < sensor_fusion.size(); i+=1) {
+		id = sensor_fusion[i][CAR_ID];
+		x = sensor_fusion[i][CAR_X];
+		y = sensor_fusion[i][CAR_Y];
+		vx = sensor_fusion[i][CAR_VX];
+		vy = sensor_fusion[i][CAR_VY];
+		s = sensor_fusion[i][CAR_S];
+		d = sensor_fusion[i][CAR_D];
+		// check lane distance
+    // Adjacent lane cars
+		if(abs(d - car_d) < 7 && abs(s - car_s) < 20) {
+			// Calculate predictions
+			filtered.push_back({id, x, y, vx, vy, s, d});
+		}
+	}
+  return filtered;
+}
 /**************************************************
  * COST FUNCTIONS for Behaviour Planners
  **************************************************/
-double buffer_cost(double shortest_dist_in_mov) {
-
-}
+//double buffer_cost(double shortest_dist_in_mov) {
+//	return 0;
+//}
 
 int main() {
   uWS::Hub h;
@@ -529,7 +550,6 @@ int main() {
 					}
 
 					// Predict with dynamics or not?
-
 					vector<double> container;
 
 					vector<tk::spline> wp_sp;
@@ -556,7 +576,8 @@ int main() {
 					// Refining dt with real time calc?
           // TODO: calculate speed difference in Cartesian to clamp speed
 					// and acceleration and jerk
-					double dt = 0.02;
+					// Average DT
+					double DT = 0.02;
 					double next_car_d = car_d;
 					// PID parameter
 					double PID_P = 0.01;
@@ -602,21 +623,29 @@ int main() {
             target_velocity = 49;
 					}
 
-					cout << "Closest distance: " << closest_front << endl;
-					cout << "Velocity: " << target_velocity << endl;
+//					cout << "Closest distance: " << closest_front << endl;
+//					cout << "Velocity: " << target_velocity << endl;
 
 					double target_vs = max_s_diff;
 					if (closest_front < CLOSE_DISTANCE) {
 						target_vs = target_velocity * .44704/50;
 					}
-          cout << "target_vs: " << target_vs << endl;
-					cout << "car_vs from precalculated: " << car_vs << endl;
+//          cout << "target_vs: " << target_vs << endl;
+//					cout << "car_vs from precalculated: " << car_vs << endl;
 
 					double s_error = 0;
-          double vs_diff = 0.001;
+          // double vs_diff = 0.001;
+					double vs_diff = 0.0005;
+
+					/***********************************************
+					 * Calculating accels from past speed record
+					 ***********************************************/
+					cout << "Acc before feeding into prediction: " << endl;
+					for (auto i = 1; i <= consumered_steps; i+=1) {
+						cout << "acc: " << (VS[i] - VS[i-1])/DT <<endl;
+					}
 
           VS.clear();
-
           /****************************
            * Prediction loop
            ****************************/
