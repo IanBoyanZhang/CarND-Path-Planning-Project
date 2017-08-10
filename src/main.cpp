@@ -35,6 +35,13 @@ const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
 const double DETECTION_DISTANCE = 50;
 
+struct ego_xysd_t {
+  double x;
+  double y;
+  double s;
+  double d;
+};
+
 // Trajectory in (s, d) space
 //struct traj_sd_t {
 //	vector<double> s;
@@ -365,22 +372,24 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 }
 
 double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-											const double T, const double t_inc) {
-	vector<double> ego_xy;
+											const double T, const double t_inc, const ego_xysd_t ego) {
   double future_x, future_y;
-	if (collides_with(future_x, future_y, ego_xy[0], ego_xy[1])) {
-
+	for (auto i = 0; i < sensor_fusion_snapshot.size(); i+=1) {
+		future_x = sensor_fusion_snapshot[i][CAR_X];
+		future_y = sensor_fusion_snapshot[i][CAR_Y];
+		if (collides_with(future_x, future_y, ego.x, ego.y)) {
+		}
 	}
 	return 0;
 }
 
 double buffer_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-									 const double T, const double t_inc) {
+									 const double T, const double t_inc, const ego_xysd_t ego) {
 	return 0;
 }
 
 double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot,
-													 const double T, const double t_inc) {
+													 const double T, const double t_inc, const ego_xysd_t ego) {
   return 0;
 }
 
