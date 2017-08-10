@@ -127,7 +127,6 @@ struct vehicle_t {
   double yaw;
 };
 
-// Trajectory in (s, d) space
 struct traj_sd_t {
   std::vector<double> s;
   std::vector<double> d;

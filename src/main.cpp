@@ -33,14 +33,13 @@ using namespace std;
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
+const double DETECTION_DISTANCE = 50;
 
-struct target_distance_t {
-
-};
-
-int whichLane(double d) {
-  return 0;
-}
+// Trajectory in (s, d) space
+//struct traj_sd_t {
+//	vector<double> s;
+//	vector<double> d;
+//};
 
 // for convenience
 using json = nlohmann::json;
@@ -309,31 +308,7 @@ vector<double> localXY2mapXY(const double car_x, const double car_y,
 					l_y * sin(yaw) + l_y * cos(yaw) + car_y};
 }
 
-/*vector<tk::spline> fitXYLocalCart(const double x, const double y, const double theta, const double s, const vector<double> maps_x,
-const vector<double> maps_y, const vector<double> maps_dx, vector<double>maps_dy,
-																	const double max_s) {
-  int closest_wp = NextWaypoint(x, y, theta, maps_x, maps_y);
-	int map_size = maps_x.size();
-
-	vector<double> wp_local;
-
-  vector<double> wp_segments_x;
-	vector<double> wp_segments_y;
-	int wp_id = -1;
-  for (int i = -10; i < 15; i+=1) {
-		wp_id = (wp_id + i) % map_size;
-
-		if (wp_id < 0) {
-			wp_id += map_size;
-		}
-		// Evaluate relative to car pose
-    wp_local = mapXY2localXY(maps_x[wp_id], maps_y[wp_id], x, y, theta);
-		wp_segments_x.push_back(wp_local[0]);
-		wp_segments_y.push_back(wp_local[1]);
-	}
-}*/
-
-vector<double> getTargetXY(const double pos_s, double d, const vector<tk::spline> wp_sp) {
+vector<double> getTargetXY(const double pos_s, const double d, const vector<tk::spline> wp_sp) {
 	const int LANE_WIDTH = 4;
 	tk::spline wp_sp_x = wp_sp[0];
 	tk::spline wp_sp_y = wp_sp[1];
@@ -354,6 +329,17 @@ vector<double> getTargetXY(const double pos_s, double d, const vector<tk::spline
 	return {x + d * dx, y + d * dy};
 }
 
+/**************************************************
+ * COST FUNCTIONS for Behaviour Planners
+ **************************************************/
+bool collides_with(double car_x, double car_y, double other_x, double other_y) {
+	return distance(car_x, car_y, other_x, other_y) < 3;
+}
+
+bool in_same_lane(double car_d, double other_d) {
+	return abs(other_d - car_d) <= SAME_LANE;
+}
+
 // For now, only consider the front vehicle
 int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 														 const double car_s , const double car_d) {
@@ -367,7 +353,7 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
     // Below may not be necessary it seems the simulator sends
 		// Only the same direction traveling vehicles
 //		if (other_car_d < 0) { continue; }
-		if (abs(other_car_d - car_d) > SAME_LANE) { continue; }
+		if (!in_same_lane(car_d, other_car_d)) { continue; }
 		front_distance = sensor_fusion[i][CAR_S] - car_s;
 		if (front_distance < 0) { continue; }
     if (front_distance < closest_to_front) {
@@ -378,38 +364,73 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 	return min_id;
 }
 
+double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
+											const double T, const double t_inc) {
+	vector<double> ego_xy;
+  double future_x, future_y;
+	if (collides_with(future_x, future_y, ego_xy[0], ego_xy[1])) {
+
+	}
+	return 0;
+}
+
+double buffer_cost(const vector<vector<double> >& sensor_fusion_snapshot,
+									 const double T, const double t_inc) {
+	return 0;
+}
+
+double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot,
+													 const double T, const double t_inc) {
+  return 0;
+}
+
 // Generating prediction table for all
 // Design predicted table data structure
 // 3 dimensional data structure with T?
-vector<vector<double> > predict(const vector<vector<double> >& sensor_fusion,
-																				 double t_inc, double T, double car_x,
-																				 double car_y, double car_s, double car_d) {
-  vector< vector<double> > filtered;
+double predict(const vector<vector<double> >& sensor_fusion,
+							 const double t_inc, const double T, traj_sd_t ego_traj,
+							 const vector<tk::spline>wp_sp) {
+	//  vector< vector<double> > filtered;
 	// To achieve that
 	double x, y, vx, vy, s, d, id;
-  for (auto i = 0; i < sensor_fusion.size(); i+=1) {
-		id = sensor_fusion[i][CAR_ID];
-		x = sensor_fusion[i][CAR_X];
-		y = sensor_fusion[i][CAR_Y];
-		vx = sensor_fusion[i][CAR_VX];
-		vy = sensor_fusion[i][CAR_VY];
-		s = sensor_fusion[i][CAR_S];
-		d = sensor_fusion[i][CAR_D];
-		// check lane distance
-    // Adjacent lane cars
-		if(abs(d - car_d) < 7 && abs(s - car_s) < 20) {
-			// Calculate predictions
-			filtered.push_back({id, x, y, vx, vy, s, d});
+	double car_s, car_d;
+  car_s = ego_traj.s[0];
+	car_d = ego_traj.d[0];
+
+	double future_x, future_y;
+	vector<vector<double> > sensor_fusion_snapshot;
+
+	int nums_steps = (int)T/t_inc;
+	double t = 0;
+
+	for (int i = 0; t < nums_steps; i+=1) {
+		t = i * t_inc;
+  	for (auto i = 0; i < sensor_fusion.size(); i+=1) {
+			id = sensor_fusion[i][CAR_ID];
+			x = sensor_fusion[i][CAR_X];
+			y = sensor_fusion[i][CAR_Y];
+			vx = sensor_fusion[i][CAR_VX];
+			vy = sensor_fusion[i][CAR_VY];
+			s = sensor_fusion[i][CAR_S];
+			d = sensor_fusion[i][CAR_D];
+			// check lane distance
+    	// Adjacent lane cars
+			// Check when collision will happen
+			vector<double> ego_xy = getTargetXY(ego_traj.s[t], ego_traj.d[t], wp_sp);
+			// Check L2 distanceHopefully, there are more opportunities in the future.
+			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
+			future_y = y + vy * t;
+      future_x = x + vx * t;
+
+			sensor_fusion_snapshot.push_back({id, future_x, future_y});
+			// Going through all the cost functions
 		}
 	}
-  return filtered;
+
+  // Return state
+  return 0;
 }
-/**************************************************
- * COST FUNCTIONS for Behaviour Planners
- **************************************************/
-//double buffer_cost(double shortest_dist_in_mov) {
-//	return 0;
-//}
+
 
 int main() {
   uWS::Hub h;
@@ -632,7 +653,6 @@ int main() {
 					}
 //          cout << "target_vs: " << target_vs << endl;
 //					cout << "car_vs from precalculated: " << car_vs << endl;
-
 					double s_error = 0;
           // double vs_diff = 0.001;
 					double vs_diff = 0.0005;
