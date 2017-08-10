@@ -34,8 +34,9 @@ const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
 const double DETECTION_DISTANCE = 50;
+const double COLLITION_DISTANCE = 2.5;
 
-struct ego_xysd_t {
+struct ego_t {
   double x;
   double y;
   double s;
@@ -372,24 +373,29 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 }
 
 double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-											const double T, const double t_inc, const ego_xysd_t ego) {
+											const double T, const double t_inc, const int i, const ego_t ego) {
   double future_x, future_y;
+
+	double time_till_collision = numeric_limits<double>::max();
 	for (auto i = 0; i < sensor_fusion_snapshot.size(); i+=1) {
 		future_x = sensor_fusion_snapshot[i][CAR_X];
 		future_y = sensor_fusion_snapshot[i][CAR_Y];
-		if (collides_with(future_x, future_y, ego.x, ego.y)) {
+		if (collides_with(future_x, future_y, ego.x, ego.y) <= COLLITION_DISTANCE) {
+			time_till_collision = min(t_inc * i, time_till_collision);
 		}
 	}
-	return 0;
+	double exponent = pow(time_till_collision, 2);
+	double mult = exp(exponent);
+	return mult * COLLISION;
 }
 
 double buffer_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-									 const double T, const double t_inc, const ego_xysd_t ego) {
+									 const double T, const double t_inc, const int i, const ego_t ego) {
 	return 0;
 }
 
 double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot,
-													 const double T, const double t_inc, const ego_xysd_t ego) {
+													 const double T, const double t_inc, const int i, const ego_t ego) {
   return 0;
 }
 
@@ -652,7 +658,6 @@ int main() {
 						closest_front = numeric_limits<double>::max();
             target_velocity = 49;
 					}
-
 //					cout << "Closest distance: " << closest_front << endl;
 //					cout << "Velocity: " << target_velocity << endl;
 
