@@ -34,8 +34,18 @@ const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
 const double DETECTION_DISTANCE = 50;
-const double COLLITION_DISTANCE = 2.5;
+const double COLLISION_DISTANCE = 2.5;
 
+const double MAX_S_DIFF = 0.427;
+
+// Four types of incidents
+// COLLISION
+// MAX ACCEL
+// MAX JERK
+// MAX SPEED
+// OUT OF LANE
+
+// static double COLLISION = 1e6;
 struct ego_t {
   double x;
   double y;
@@ -380,13 +390,24 @@ double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
 	for (auto i = 0; i < sensor_fusion_snapshot.size(); i+=1) {
 		future_x = sensor_fusion_snapshot[i][CAR_X];
 		future_y = sensor_fusion_snapshot[i][CAR_Y];
-		if (collides_with(future_x, future_y, ego.x, ego.y) <= COLLITION_DISTANCE) {
+		if (collides_with(future_x, future_y, ego.x, ego.y) <= COLLISION_DISTANCE) {
 			time_till_collision = min(t_inc * i, time_till_collision);
 		}
 	}
 	double exponent = pow(time_till_collision, 2);
 	double mult = exp(exponent);
 	return mult * COLLISION;
+}
+
+double max_accel_cost(const vector<vector<double> >& sensor_fusion_snapshot,
+											const double T, const double t_inc, const int i, traj_sd_t ego_traj) {
+	// Going through trajectory to find max accels
+	// calculate movement in Map Cartesian X-Y
+	int steps = ego_traj.s.size();
+	for (auto i = 0; i < steps; i+=1) {
+
+	}
+  return 0;
 }
 
 double buffer_cost(const vector<vector<double> >& sensor_fusion_snapshot,
@@ -405,7 +426,7 @@ double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot
 double predict(const vector<vector<double> >& sensor_fusion,
 							 const double t_inc, const double T, traj_sd_t ego_traj,
 							 const vector<tk::spline>wp_sp) {
-	//  vector< vector<double> > filtered;
+	// vector< vector<double> > filtered;
 	// To achieve that
 	double x, y, vx, vy, s, d, id;
 	double car_s, car_d;
@@ -446,6 +467,41 @@ double predict(const vector<vector<double> >& sensor_fusion,
   return 0;
 }
 
+/**************************************************
+ * Trajectory Generation
+ **************************************************/
+/**
+ *
+ * @param car_s
+ * @param car_d
+ * @param t_inc
+ * @param T
+ * @param s_inc proposed front movement increase
+ * @param d_inc proposed side-way movement increase
+ * @param wp_sp
+ * @return
+ */
+traj_sd_t generate_traj(const double car_s, const double car_d, const double t_inc, const double T,
+										 double s_inc, const double d_inc, const vector<tk::spline> wp_sp) {
+	traj_sd_t trajSd;
+
+	vector<double> ego_xy = getTargetXY(car_s, car_d, wp_sp);
+  vector<double> ego_xy_next;
+  double dist_inc;
+	// TODO: Reject trajectories exceed max_accel and etc
+	int steps = (int)T/t_inc;
+	for (auto i = 1; i < steps; i+=1) {
+		ego_xy_next = getTargetXY(car_s + s_inc * i, car_d + d_inc * i, wp_sp);
+		dist_inc = distance(ego_xy[0], ego_xy[0], ego_xy_next[0], ego_xy_next[1]);
+		while (dist_inc > MAX_S_DIFF) {
+			s_inc *= 0.8;
+			ego_xy_next = getTargetXY(car_s + s_inc * i, car_d + d_inc * i, wp_sp);
+			dist_inc = distance(ego_xy[0], ego_xy[0], ego_xy_next[0], ego_xy_next[1]);
+		}
+//    trajSd.s.push_back(car_s + )
+	}
+	return trajSd;
+}
 
 int main() {
   uWS::Hub h;
@@ -671,6 +727,8 @@ int main() {
           // double vs_diff = 0.001;
 					double vs_diff = 0.0005;
 
+					double pred_car_s = car_s;
+          double pred_car_d = car_d;
 					/***********************************************
 					 * Calculating accels from past speed record
 					 ***********************************************/
