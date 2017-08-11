@@ -784,8 +784,15 @@ int main() {
              *****************************************************/
 						VS.push_back(car_vs);
 //            cout << "car_vs: " << car_vs << endl;
-						container = getTargetXY(car_s + car_vs * (i), car_d + d_inc * (i), wp_sp);
-						container_next = getTargetXY(car_s + car_vs * (i + 1), car_d + d_inc * (i + 1), wp_sp);
+            /**
+             * Previous code is car_s + car_vs * i and car_s + car_vs * (i + 1)
+             * Previous code is car_d + d_inc * i and car_d + d_inc * (i + 1)
+             */
+						container = getTargetXY(pred_car_s + car_vs, pred_car_d + d_inc, wp_sp);
+						container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + d_inc * 2, wp_sp);
+
+            pred_car_s += car_vs;
+            pred_car_d += d_inc;
 
 						// log
 //						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
