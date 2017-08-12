@@ -585,43 +585,50 @@ double predict(const vector<vector<double> >& sensor_fusion,
 //	return traj_xy;
 //}
 
-vector<vector<double> > generate_traj(double& car_vs, double &car_vd, double& next_car_d, double& d_end,
+void generate_traj(double& car_vs, double &car_vd, double& next_car_d, double& d_end,
 																			double PID_P, double& car_d, double vs_diff, double target_vs, vector<double>& VS,
-																			double& pred_car_s, double& pred_car_d, vector<tk::spline> wp_sp) {
-	// Predicted vehicle location of CTE using projected dynamics
-	double cte = next_car_d - d_end;
-	// P term
-	if (abs(cte) >= 0.7) {
-		car_vd = 0.01 * -cte;
-	}
-	if (abs(cte) > 0.1 && abs(cte) < 0.7) {
-		car_vd = PID_P * (-cte);
-		if (abs(car_d - 2) > 30) {
-			car_d = 0;
+																			double& pred_car_s, double& pred_car_d, vector<tk::spline> wp_sp, int nums_step,
+																			vector<double>& next_x_vals, vector<double>& next_y_vals) {
+	vector<vector<double> > traj_res;
+  vector<double> container;
+	vector<double> container_next;
+	for (int i = 1; i < nums_step; i+=1) {
+		// Predicted vehicle location of CTE using projected dynamics
+		double cte = next_car_d - d_end;
+		// P term
+		if (abs(cte) >= 0.7) {
+			car_vd = 0.01 * -cte;
 		}
+		if (abs(cte) > 0.1 && abs(cte) < 0.7) {
+			car_vd = PID_P * (-cte);
+			if (abs(car_d - 2) > 30) {
+				car_d = 0;
+			}
+		}
+		// D term
+		next_car_d += car_vd;
+		// S_control
+		double s_error = car_vs - target_vs;
+
+		if(s_error < 0) {
+			car_vs += vs_diff;
+		} else {
+			car_vs -= vs_diff;
+		}
+
+		/*****************************************************
+   	 * Caching velocity prediction for next simulator loop
+   	 *****************************************************/
+		VS.push_back(car_vs);
+		container = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
+		container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
+
+		pred_car_s += car_vs;
+		pred_car_d += car_vd;
+
+		next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
+		next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
 	}
-	// D term
-	next_car_d += car_vd;
-	// S_control
-	double s_error = car_vs - target_vs;
-
-	if(s_error < 0) {
-		car_vs += vs_diff;
-	} else {
-		car_vs -= vs_diff;
-	}
-
-	/*****************************************************
-   * Caching velocity prediction for next simulator loop
-   *****************************************************/
-	VS.push_back(car_vs);
-	vector<double> container = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
-	vector<double> container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
-
-	pred_car_s += car_vs;
-	pred_car_d += car_vd;
-
-	return {container, container_next};
 }
 
 int main() {
@@ -763,8 +770,6 @@ int main() {
 					}
 
 					// Predict with dynamics or not?
-					vector<double> container;
-
 					vector<tk::spline> wp_sp;
 
 					wp_sp = fitXY(pos_s, map_waypoints_s,
@@ -776,7 +781,6 @@ int main() {
 					next_x_vals.push_back(car_x);
 					next_y_vals.push_back(car_y);
 
-          vector<double> container_next;
 					double x_diff, y_diff;
 					vector<double> x_diff_vec, y_diff_vec;
 					double d_start = car_d;
@@ -846,7 +850,6 @@ int main() {
 					double pred_car_s = car_s;
           double pred_car_d = car_d;
 
-					vector<vector<double> > traj_res;
 					/***********************************************
 					 * Calculating accels from past speed record
 					 ***********************************************/
@@ -856,17 +859,9 @@ int main() {
 					}
 
           VS.clear();
-          /****************************
-           * Prediction loop
-           ****************************/
-					for (int i = 1; i < nums_step; i+=1) {
-						traj_res = generate_traj(car_vs, car_vd, next_car_d, d_end, PID_P, car_d, vs_diff, target_vs, VS, pred_car_s, pred_car_d, wp_sp);
-						container = traj_res[0];
-						container_next = traj_res[1];
-            next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
-						next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
-					}
 
+					generate_traj(car_vs, car_vd, next_car_d, d_end, PID_P, car_d, vs_diff, target_vs, VS,
+												pred_car_s, pred_car_d, wp_sp, nums_step, next_x_vals, next_y_vals);
 					cout << "path size: " << path_size << endl;
           cout << "end of packets <<<<<<<<<< " << endl;
 
