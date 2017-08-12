@@ -483,110 +483,6 @@ double predict(const vector<vector<double> >& sensor_fusion,
   return 0;
 }
 
-/**************************************************
- * Trajectory Generation
- **************************************************/
-// d_end, d_start -> car_d
-// s_end, s_start -> car_s
-//traj_xy_t generate_traj(car_telemetry_t car_telemetry, const double t_inc, const double T,
-//												double d_end, double s_end, double s_inc, double car_vd,
-//												const double target_speed, const vector<tk::spline> wp_sp,
-//												vector<double>& VS, const int consumered_steps) {
-//	traj_xy_t traj_xy;
-//
-//	double car_d = car_telemetry.car_d;
-//	double car_s = car_telemetry.car_s;
-//  double car_x = car_telemetry.car_x;
-//	double car_y = car_telemetry.car_y;
-//  double car_speed = car_telemetry.car_speed;
-////  double car_vs = car_speed * 0.44704/50;
-//  // reliable car_vs is
-//	// Happen to be the very next timestamp
-//	double car_vs = VS[consumered_steps];
-//
-//	double next_car_d = car_d;
-//	double PID_P = 0.01;
-//  double cte = 0;
-//  double s_error = 0;
-//
-//  double vs_diff = 0.0005;
-//	// double lane = 2
-//	// Sample d_end = 2 + lane * 4;
-//
-//	int nums_step = (int)T/t_inc;
-//	double target_vs = target_speed * 0.44704/50;
-//
-//	// int nums_step = 50;
-//
-//	double dist_inc = 0;
-//	vector<double> ego_xy = getTargetXY(car_s, car_d, wp_sp);
-//  vector<double> ego_xy_next;
-//
-//	double pred_car_s = car_s;
-//	double pred_car_d = car_d;
-//
-//	traj_xy.x.push_back(car_x);
-//	traj_xy.y.push_back(car_y);
-//
-//	for (int i = 0; i < nums_step; i+=1) {
-//		cte = next_car_d - d_end;
-//
-// 		/******************
-//  	 * D control
-//  	 ******************/
-//  	// P term
-//		if (abs(cte) >= 0.7) {
-//			car_vd = 0.01 * -cte;
-//		}
-//		if (abs(cte) > 0.1 && abs(cte) < 0.7) {
-//			car_vd = PID_P * (-cte);
-//			// Just for reseting after wrapping around track
-//			if (abs(car_d - 2) > 30) {
-//				car_d = 0;
-//			}
-//		}
-//		// D term
-//  	next_car_d += car_vd;
-// 		/******************
-//  	 * S control
-//  	 ******************/
-//		s_error = car_vs - target_vs;
-//
-//		if (s_error < 0) {
-//			car_vs += vs_diff;
-//		} else {
-//			car_vs -= vs_diff;
-//		}
-//
-//    // Now we have car_vs and car_vd
-//    ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
-//		ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
-//
-//		dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
-//		// Reject trajectories exceed max_velo
-//		// TOOD: Reject trajectories exceed max_accel
-//    while (dist_inc > MAX_DIST_DIFF) {
-//			car_vs *= 0.8;
-//			ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
-//			ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
-//			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
-//		}
-//
-//		pred_car_s += car_vs;
-//		pred_car_d += car_vd;
-//
-//		/*****************************************************
-//     * Caching velocity prediction for next simulator loop
-//     *****************************************************/
-//		VS.push_back(car_vs);
-//
-//		traj_xy.x.push_back(traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0]);
-//		traj_xy.y.push_back(traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1]);
-//	}
-//
-//	return traj_xy;
-//}
-
 void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd, double& next_car_d, double& d_end,
 																			double target_vs, vector<double>& VS,
 																			vector<tk::spline> wp_sp, int nums_step,
@@ -596,8 +492,10 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 	double pred_car_s = car_s;
   double pred_car_d = car_d;
 	vector<vector<double> > traj_res;
-  vector<double> container;
-	vector<double> container_next;
+  vector<double> ego_xy;
+	vector<double> ego_xy_next;
+
+	double dist_inc = 0;
 	for (int i = 1; i < nums_step; i+=1) {
 		// Predicted vehicle location of CTE using projected dynamics
 		double cte = next_car_d - d_end;
@@ -625,15 +523,23 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 		/*****************************************************
    	 * Caching velocity prediction for next simulator loop
    	 *****************************************************/
-		VS.push_back(car_vs);
-		container = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
-		container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
+		ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
+		ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
 
+		dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
+		while (dist_inc > MAX_DIST_DIFF) {
+			car_vs *= 0.8;
+			ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
+			ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
+			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
+		}
+
+		VS.push_back(car_vs);
 		pred_car_s += car_vs;
 		pred_car_d += car_vd;
 
-		next_x_vals.push_back(next_x_vals[i - 1] + container_next[0] - container[0]);
-		next_y_vals.push_back(next_y_vals[i - 1] + container_next[1] - container[1]);
+		next_x_vals.push_back(next_x_vals[i - 1] + ego_xy_next[0] -  ego_xy[0]);
+		next_y_vals.push_back(next_y_vals[i - 1] + ego_xy_next[1] -  ego_xy[1]);
 	}
 }
 
