@@ -496,7 +496,7 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 
 	double dist_inc = 0;
 	for (int i = 1; i < nums_step; i+=1) {
-		// Predicted vehicle location of CTE using projected dynamics
+    // Use dynamics to predict motion?
 		double cte = pred_car_d - d_end;
 		// P term
 		if (abs(cte) >= 0.7) {
@@ -692,35 +692,12 @@ int main() {
 					next_x_vals.push_back(car_x);
 					next_y_vals.push_back(car_y);
 
-					double x_diff, y_diff;
-					vector<double> x_diff_vec, y_diff_vec;
-					double d_start = car_d;
-					int lane = 2;
-					double d_end = 2 + lane * 4;
-
-					double step_dist = d_end - car_d;
-					double car_vd = step_dist/200;
-
 					// Refining dt with real time calc?
-          // TODO: calculate speed difference in Cartesian to clamp speed
-					// and acceleration and jerk
-					// Average DT
-					double DT = 0.02;
+//					double DT = 0.02;
 
-          /******************
-           * Speed control
-           ******************/
-					double car_vs = car_speed * 0.44704/50;
-					cout << "car_vs from car_speed: " << car_vs << endl;
-					int consumered_steps = 0;
-					if (path_size == 0) {
-						consumered_steps = 3;
-						car_vs = 0;
-					} else {
-						consumered_steps = nums_step - path_size;
-						// Happen to be the very next timestamp
-						car_vs = VS[consumered_steps];
-					}
+// Telemetry car_speed is measured in X_Y?
+//					double car_vs = car_speed * 0.44704/50;
+//					cout << "car_vs from car_speed: " << car_vs << endl
 
           /********************
            * Preliminary Behavior Planner
@@ -751,13 +728,35 @@ int main() {
 					}
 
 					/***********************************************
+  				 * Define vs
+  				 ***********************************************/
+					double car_vs;
+					int consumered_steps = 0;
+					if (path_size == 0) {
+						consumered_steps = 3;
+						car_vs = 0;
+					} else {
+						consumered_steps = nums_step - path_size;
+						// Happen to be the very next timestamp
+						car_vs = VS[consumered_steps];
+					}
+
+					/***********************************************
+  				 * Define target d_end and vd
+  				 ***********************************************/
+					int lane = 2;
+					double d_end = 2 + lane * 4;
+
+					double step_dist = d_end - car_d;
+					double car_vd = step_dist/200;
+					/***********************************************
 					 * Trajectory Generation
 					 ***********************************************/
 					generate_traj(car_s, car_d, car_vs, car_vd, d_end, target_vs, VS,
 												wp_sp, nums_step, next_x_vals, next_y_vals);
 
-					cout << "path size: " << path_size << endl;
-          cout << "end of packets <<<<<<<<<< " << endl;
+//					cout << "path size: " << path_size << endl;
+//          cout << "end of packets <<<<<<<<<< " << endl;
 
 					msgJson["next_x"] = next_x_vals;
 					msgJson["next_y"] = next_y_vals;
