@@ -795,8 +795,6 @@ int main() {
 						closest_front = numeric_limits<double>::max();
             target_velocity = 49;
 					}
-//					cout << "Closest distance: " << closest_front << endl;
-//					cout << "Velocity: " << target_velocity << endl;
 
 					double target_vs = max_s_diff;
 					if (closest_front < CLOSE_DISTANCE) {
@@ -862,11 +860,6 @@ int main() {
              * Caching velocity prediction for next simulator loop
              *****************************************************/
 						VS.push_back(car_vs);
-//            cout << "car_vs: " << car_vs << endl;
-            /**
-             * Previous code is car_s + car_vs * i and car_s + car_vs * (i + 1)
-             * Previous code is car_d + d_inc * i and car_d + d_inc * (i + 1)
-             */
 						container = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
 						container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
 
