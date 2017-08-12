@@ -38,6 +38,8 @@ const double COLLISION_DISTANCE = 2.5;
 
 const double MAX_DIST_DIFF = 0.427;
 
+const double PID_P = 0.01;
+
 // Four types of incidents
 // COLLISION
 // MAX ACCEL
@@ -585,10 +587,14 @@ double predict(const vector<vector<double> >& sensor_fusion,
 //	return traj_xy;
 //}
 
-void generate_traj(double& car_vs, double &car_vd, double& next_car_d, double& d_end,
-																			double PID_P, double& car_d, double vs_diff, double target_vs, vector<double>& VS,
-																			double& pred_car_s, double& pred_car_d, vector<tk::spline> wp_sp, int nums_step,
+void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd, double& next_car_d, double& d_end,
+																			double target_vs, vector<double>& VS,
+																			vector<tk::spline> wp_sp, int nums_step,
 																			vector<double>& next_x_vals, vector<double>& next_y_vals) {
+	VS.clear();
+  double vs_diff = 0.0005;
+	double pred_car_s = car_s;
+  double pred_car_d = car_d;
 	vector<vector<double> > traj_res;
   vector<double> container;
 	vector<double> container_next;
@@ -823,7 +829,6 @@ int main() {
            *
            * sensor[id][0, 1, 2...]
            ********************/
-
           double car_vx, car_vy;
 
 					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
@@ -843,25 +848,13 @@ int main() {
 					if (closest_front < CLOSE_DISTANCE) {
 						target_vs = target_velocity * .44704/50;
 					}
-					double s_error = 0;
-          // double vs_diff = 0.001;
-					double vs_diff = 0.0005;
-
-					double pred_car_s = car_s;
-          double pred_car_d = car_d;
 
 					/***********************************************
-					 * Calculating accels from past speed record
+					 * Trajectory Generation
 					 ***********************************************/
-					cout << "Acc before feeding into prediction: " << endl;
-					for (auto i = 1; i <= consumered_steps; i+=1) {
-						cout << "acc: " << (VS[i] - VS[i-1])/DT <<endl;
-					}
+					generate_traj(car_s, car_d, car_vs, car_vd, next_car_d, d_end, target_vs, VS,
+												wp_sp, nums_step, next_x_vals, next_y_vals);
 
-          VS.clear();
-
-					generate_traj(car_vs, car_vd, next_car_d, d_end, PID_P, car_d, vs_diff, target_vs, VS,
-												pred_car_s, pred_car_d, wp_sp, nums_step, next_x_vals, next_y_vals);
 					cout << "path size: " << path_size << endl;
           cout << "end of packets <<<<<<<<<< " << endl;
 
