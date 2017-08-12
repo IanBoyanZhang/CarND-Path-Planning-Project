@@ -53,6 +53,15 @@ struct ego_t {
   double d;
 };
 
+struct car_telemetry_t {
+	double car_x;
+	double car_y;
+	double car_s;
+	double car_d;
+	double car_yaw;
+	double car_speed;
+};
+
 // Trajectory in (s, d) space
 //struct traj_sd_t {
 //	vector<double> s;
@@ -177,7 +186,6 @@ vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x
 	frenet_s += distance(0,0,proj_x,proj_y);
 
 	return {frenet_s,frenet_d};
-
 }
 
 /**
@@ -470,20 +478,65 @@ double predict(const vector<vector<double> >& sensor_fusion,
 /**************************************************
  * Trajectory Generation
  **************************************************/
-/**
- *
- * @param car_s
- * @param car_d
- * @param t_inc
- * @param T
- * @param s_inc proposed front movement increase
- * @param d_inc proposed side-way movement increase
- * @param wp_sp
- * @return
- */
-traj_sd_t generate_traj(const double car_s, const double car_d, const double t_inc, const double T,
-										 double s_inc, const double d_inc, const vector<tk::spline> wp_sp) {
+// d_end, d_start -> car_d
+// s_end, s_start -> car_s
+traj_sd_t generate_traj(car_telemetry_t car_telemetry, const double t_inc, const double T,
+												double d_end, double s_end, double s_inc, double d_inc,
+												const double target_speed, const vector<tk::spline> wp_sp,
+												vector<double>& VS) {
 	traj_sd_t trajSd;
+
+	double car_d = car_telemetry.car_d;
+	double car_s = car_telemetry.car_s;
+  double car_speed = car_telemetry.car_speed;
+  double car_vs = car_speed * 0.44704/50;
+
+	double next_car_d = car_d;
+	double PID_P = 0.01;
+  double cte = 0, prev_d_inc = 0;
+  double s_error = 0;
+
+  double vs_diff = 0.0005;
+	// double lane = 2
+	// Sample d_end = 2 + lane * 4;
+
+	int nums_step = (int)T/t_inc;
+	double target_vs = target_speed * 0.44704/50;
+
+	// int nums_step = 50;
+	for (int i = 0; i < nums_step; i+=1) {
+		cte = next_car_d - d_end;
+
+ 		/******************
+  	 * D control
+  	 ******************/
+  	// P term
+		if (abs(cte) >= 0.7) {
+			d_inc = 0.01 * -cte;
+		}
+		if (abs(cte) > 0.1 && abs(cte) < 0.7) {
+			d_inc = PID_P * (-cte);
+			// Just for reseting after wrapping around track
+			if (abs(car_d - 2) > 30) {
+				car_d = 0;
+			}
+		}
+		// D term
+  	next_car_d += d_inc;
+ 		/******************
+  	 * S control
+  	 ******************/
+		s_error = car_vs - target_vs;
+
+		if (s_error < 0) {
+			car_vs += vs_diff;
+		} else {
+			car_vs -= vs_diff;
+		}
+
+		// Now we have car_vs and d_inc
+	}
+
 
 	vector<double> ego_xy = getTargetXY(car_s, car_d, wp_sp);
   vector<double> ego_xy_next;
@@ -663,7 +716,7 @@ int main() {
 					double d_end = 2 + lane * 4;
 
 					double step_dist = d_end - car_d;
-					double d_inc = step_dist/200;
+					double car_vd = step_dist/200;
 
 					// Refining dt with real time calc?
           // TODO: calculate speed difference in Cartesian to clamp speed
@@ -674,7 +727,6 @@ int main() {
 					// PID parameter
 					double PID_P = 0.01;
 					double cte = 0, prev_d_inc = 0;
-          double d_inc_diff = 0;
 
           /******************
            * Speed control
@@ -721,8 +773,6 @@ int main() {
 					if (closest_front < CLOSE_DISTANCE) {
 						target_vs = target_velocity * .44704/50;
 					}
-//          cout << "target_vs: " << target_vs << endl;
-//					cout << "car_vs from precalculated: " << car_vs << endl;
 					double s_error = 0;
           // double vs_diff = 0.001;
 					double vs_diff = 0.0005;
@@ -758,16 +808,16 @@ int main() {
 						cte = next_car_d - d_end;
 						// P term
             if (abs(cte) >= 0.7) {
-							d_inc = 0.01 * -cte;
+							car_vd = 0.01 * -cte;
 						}
             if (abs(cte) > 0.1 && abs(cte) < 0.7) {
-							d_inc = PID_P * (-cte);
+							car_vd = PID_P * (-cte);
 							if (abs(car_d - 2) > 30) {
                 car_d = 0;
 							}
 						}
 						// D term
-            next_car_d += d_inc;
+            next_car_d += car_vd;
 						//------------------------------------
             // S_control
 						//------------------------------------
@@ -788,11 +838,11 @@ int main() {
              * Previous code is car_s + car_vs * i and car_s + car_vs * (i + 1)
              * Previous code is car_d + d_inc * i and car_d + d_inc * (i + 1)
              */
-						container = getTargetXY(pred_car_s + car_vs, pred_car_d + d_inc, wp_sp);
-						container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + d_inc * 2, wp_sp);
+						container = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
+						container_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
 
             pred_car_s += car_vs;
-            pred_car_d += d_inc;
+            pred_car_d += car_vd;
 
 						// log
 //						cout << "x_y_dist: " << sqrt(pow(x_diff, 2) + pow(y_diff, 2)) << endl;
