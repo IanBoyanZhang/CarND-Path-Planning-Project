@@ -483,10 +483,9 @@ double predict(const vector<vector<double> >& sensor_fusion,
   return 0;
 }
 
-void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd, double& next_car_d, double& d_end,
-																			double target_vs, vector<double>& VS,
-																			vector<tk::spline> wp_sp, int nums_step,
-																			vector<double>& next_x_vals, vector<double>& next_y_vals) {
+void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
+									 double& d_end, double target_vs, vector<double>& VS,
+									 vector<tk::spline> wp_sp, int nums_step, vector<double>& next_x_vals, vector<double>& next_y_vals) {
 	VS.clear();
   double vs_diff = 0.0005;
 	double pred_car_s = car_s;
@@ -498,7 +497,7 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 	double dist_inc = 0;
 	for (int i = 1; i < nums_step; i+=1) {
 		// Predicted vehicle location of CTE using projected dynamics
-		double cte = next_car_d - d_end;
+		double cte = pred_car_d - d_end;
 		// P term
 		if (abs(cte) >= 0.7) {
 			car_vd = 0.01 * -cte;
@@ -510,7 +509,7 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 			}
 		}
 		// D term
-		next_car_d += car_vd;
+		pred_car_d += car_vd;
 		// S_control
 		double s_error = car_vs - target_vs;
 
@@ -707,10 +706,6 @@ int main() {
 					// and acceleration and jerk
 					// Average DT
 					double DT = 0.02;
-					double next_car_d = car_d;
-					// PID parameter
-					double PID_P = 0.01;
-					double cte = 0, prev_d_inc = 0;
 
           /******************
            * Speed control
@@ -758,7 +753,7 @@ int main() {
 					/***********************************************
 					 * Trajectory Generation
 					 ***********************************************/
-					generate_traj(car_s, car_d, car_vs, car_vd, next_car_d, d_end, target_vs, VS,
+					generate_traj(car_s, car_d, car_vs, car_vd, d_end, target_vs, VS,
 												wp_sp, nums_step, next_x_vals, next_y_vals);
 
 					cout << "path size: " << path_size << endl;
