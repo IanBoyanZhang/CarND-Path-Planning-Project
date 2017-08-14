@@ -76,6 +76,13 @@ struct traj_xy_t {
 	vector<double> y;
 };
 
+struct traj_params_t {
+	double car_vs;
+	double car_vd;
+	double d_end;
+	double target_vs;
+};
+
 // for convenience
 using json = nlohmann::json;
 
@@ -120,7 +127,6 @@ int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> ma
 			closestLen = dist;
 			closestWaypoint = i;
 		}
-
 	}
 
 	return closestWaypoint;
@@ -416,10 +422,10 @@ double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
 }
 
 double max_accel_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-											const double T, const double t_inc, const int i, traj_sd_t ego_traj) {
+											const double T, const double t_inc, const int i, traj_xy_t ego_traj) {
 	// Going through trajectory to find max accels
 	// calculate movement in Map Cartesian X-Y
-	int steps = ego_traj.s.size();
+	int steps = ego_traj.x.size();
 	for (auto i = 0; i < steps; i+=1) {
 
 	}
@@ -440,14 +446,11 @@ double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot
 // Design predicted table data structure
 // 3 dimensional data structure with T?
 double predict(const vector<vector<double> >& sensor_fusion,
-							 const double t_inc, const double T, traj_sd_t ego_traj,
+							 const double t_inc, const double T, traj_xy_t ego_traj,
 							 const vector<tk::spline>wp_sp) {
 	// vector< vector<double> > filtered;
 	// To achieve that
 	double x, y, vx, vy, s, d, id;
-	double car_s, car_d;
-  car_s = ego_traj.s[0];
-	car_d = ego_traj.d[0];
 
 	double future_x, future_y;
 	vector<vector<double> > sensor_fusion_snapshot;
@@ -468,7 +471,7 @@ double predict(const vector<vector<double> >& sensor_fusion,
 			// check lane distance
     	// Adjacent lane cars
 			// Check when collision will happen
-			vector<double> ego_xy = getTargetXY(ego_traj.s[t], ego_traj.d[t], wp_sp);
+			vector<double> ego_xy = {ego_traj.x[t], ego_traj.y[t]};
 			// Check L2 distanceHopefully, there are more opportunities in the future.
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
 			future_y = y + vy * t;
@@ -481,6 +484,54 @@ double predict(const vector<vector<double> >& sensor_fusion,
 
   // Return state
   return 0;
+}
+
+// FSM
+// lane or d?
+/**
+ * car_vs should really be from car_telemetry
+ * @param car_telemetry
+ * @param sensor_fusion
+ * @param car_vs
+ * @param nums_step
+ * @return
+ */
+traj_params_t realize_stay_lane(car_telemetry_t car_telemetry,
+																vector<vector<double> >& sensor_fusion,
+																double car_vs) {
+	double car_s = car_telemetry.car_s;
+	double car_d = car_telemetry.car_d;
+
+  double car_vx, car_vy;
+	int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
+	double closest_front;
+	double target_velocity;
+	if (closest_id != -1) {
+		car_vx = sensor_fusion[closest_id][CAR_VX];
+		car_vy = sensor_fusion[closest_id][CAR_VY];
+		closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+		target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
+	} else {
+		closest_front = numeric_limits<double>::max();
+		target_velocity = 49;
+	}
+
+	// Define trajectory parameters
+	double target_vs = MAX_DIST_DIFF;
+	if (closest_front < CLOSE_DISTANCE) {
+		target_vs = target_velocity * .44704/50;
+	}
+	/***********************************************
+	 * Define target d_end and vd
+   ***********************************************/
+	int lane = int((car_d - 2)/4);
+	double d_end = 2 + lane * 4;
+
+	double step_dist = d_end - car_d;
+	double car_vd = step_dist/200;
+
+	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
+  return traj_params;
 }
 
 void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
@@ -520,7 +571,7 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 		}
 
 		/*****************************************************
-   	 * Caching velocity prediction for next simulator loop
+   	 * Caching velocity predictions for next simulator loop
    	 *****************************************************/
 		ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
 		ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
@@ -695,10 +746,6 @@ int main() {
 					// Refining dt with real time calc?
 //					double DT = 0.02;
 
-// Telemetry car_speed is measured in X_Y?
-//					double car_vs = car_speed * 0.44704/50;
-//					cout << "car_vs from car_speed: " << car_vs << endl
-
           /********************
            * Preliminary Behavior Planner
            * To follow single line, going straight, just slowing down
@@ -709,6 +756,7 @@ int main() {
            ********************/
           double car_vx, car_vy;
 
+					// TODO: Starting with FSM
 					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
           double closest_front;
 					double target_velocity;
