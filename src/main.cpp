@@ -756,27 +756,6 @@ int main() {
            *
            * sensor[id][0, 1, 2...]
            ********************/
-//          double car_vx, car_vy;
-//
-//					// TODO: Starting with FSM
-//					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
-//          double closest_front;
-//					double target_velocity;
-//					if (closest_id != -1) {
-//						car_vx = sensor_fusion[closest_id][CAR_VX];
-//						car_vy = sensor_fusion[closest_id][CAR_VY];
-//            closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
-//						target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
-//					} else {
-//						closest_front = numeric_limits<double>::max();
-//            target_velocity = 49;
-//					}
-//
-//					double target_vs = max_s_diff;
-//					if (closest_front < CLOSE_DISTANCE) {
-//						target_vs = target_velocity * .44704/50;
-//					}
-
 					/***********************************************
   				 * Define vs
   				 ***********************************************/
@@ -794,14 +773,6 @@ int main() {
           car_telemetry_t car_telemetry = {car_x, car_y, car_s, car_d, car_yaw, car_speed};
 					traj_params_t traj_params = realize_stay_lane(car_telemetry, sensor_fusion, car_vs);
 
-					/***********************************************
-  				 * Define target d_end and vd
-  				 ***********************************************/
-//					int lane = 2;
-//					double d_end = 2 + lane * 4;
-//
-//					double step_dist = d_end - car_d;
-//					double car_vd = step_dist/200;
 					/***********************************************
 					 * Trajectory Generation
 					 ***********************************************/
