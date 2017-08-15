@@ -48,11 +48,14 @@ const double PID_P = 0.01;
 // OUT OF LANE
 
 // static double COLLISION = 1e6;
-struct ego_t {
+struct ego_xy_t {
   double x;
   double y;
-  double s;
-  double d;
+};
+
+struct ego_sd_t {
+	double s;
+	double d;
 };
 
 struct car_telemetry_t {
@@ -405,7 +408,7 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 }
 
 double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-											const double T, const double t_inc, const int i, const ego_t ego) {
+											const double t_inc, const double T, const ego_xy_t ego) {
   double future_x, future_y;
 
 	double time_till_collision = numeric_limits<double>::max();
@@ -417,7 +420,7 @@ double collision_cost(const vector<vector<double> >& sensor_fusion_snapshot,
 		}
 	}
 	double exponent = pow(time_till_collision, 2);
-	double mult = exp(exponent);
+	double mult = exp(-exponent);
 	return mult * COLLISION;
 }
 
@@ -433,12 +436,12 @@ double max_accel_cost(const vector<vector<double> >& sensor_fusion_snapshot,
 }
 
 double buffer_cost(const vector<vector<double> >& sensor_fusion_snapshot,
-									 const double T, const double t_inc, const int i, const ego_t ego) {
+									 const double T, const double t_inc, const int i, const ego_xy_t ego) {
 	return 0;
 }
 
 double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot,
-													 const double T, const double t_inc, const int i, const ego_t ego) {
+													 const double T, const double t_inc, const int i, const ego_xy_t ego) {
   return 0;
 }
 
@@ -458,8 +461,13 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	int nums_steps = (int)T/t_inc;
 	double t = 0;
 
+  // Calculate multiple costs
+	double cost = 0;
+	ego_xy_t ego;
+
 	for (int i = 0; t < nums_steps; i+=1) {
 		t = i * t_inc;
+    ego = {ego_traj.x[i], ego_traj.y[i]};
   	for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
 			x = sensor_fusion[i][CAR_X];
@@ -478,12 +486,13 @@ double predict(const vector<vector<double> >& sensor_fusion,
       future_x = x + vx * t;
 
 			sensor_fusion_snapshot.push_back({id, future_x, future_y});
-			// Going through all the cost functions
+			// Going through all cost functions
+			cost += collision_cost(sensor_fusion_snapshot, t_inc, T, ego);
 		}
 	}
 
-  // Return state
-  return 0;
+  // Return cost
+  return cost;
 }
 
 // FSM
