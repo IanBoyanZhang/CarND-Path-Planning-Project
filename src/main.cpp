@@ -488,16 +488,17 @@ double predict(const vector<vector<double> >& sensor_fusion,
 
 // FSM
 // lane or d?
+// sensor_fusion or sensor_fusion_snapshot
 /**
  * car_vs should really be from car_telemetry
  * @param car_telemetry
  * @param sensor_fusion
  * @param car_vs
- * @param nums_step
  * @return
  */
+// TODO: maybe the self lane keeping method is buggy?
 traj_params_t realize_stay_lane(car_telemetry_t car_telemetry,
-																vector<vector<double> >& sensor_fusion,
+																const vector<vector<double>>& sensor_fusion,
 																double car_vs) {
 	double car_s = car_telemetry.car_s;
 	double car_d = car_telemetry.car_d;
@@ -524,7 +525,8 @@ traj_params_t realize_stay_lane(car_telemetry_t car_telemetry,
 	/***********************************************
 	 * Define target d_end and vd
    ***********************************************/
-	int lane = int((car_d - 2)/4);
+  int lane = 2;
+//	int lane = int((car_d - 2)/4);
 	double d_end = 2 + lane * 4;
 
 	double step_dist = d_end - car_d;
@@ -754,26 +756,26 @@ int main() {
            *
            * sensor[id][0, 1, 2...]
            ********************/
-          double car_vx, car_vy;
-
-					// TODO: Starting with FSM
-					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
-          double closest_front;
-					double target_velocity;
-					if (closest_id != -1) {
-						car_vx = sensor_fusion[closest_id][CAR_VX];
-						car_vy = sensor_fusion[closest_id][CAR_VY];
-            closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
-						target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
-					} else {
-						closest_front = numeric_limits<double>::max();
-            target_velocity = 49;
-					}
-
-					double target_vs = max_s_diff;
-					if (closest_front < CLOSE_DISTANCE) {
-						target_vs = target_velocity * .44704/50;
-					}
+//          double car_vx, car_vy;
+//
+//					// TODO: Starting with FSM
+//					int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
+//          double closest_front;
+//					double target_velocity;
+//					if (closest_id != -1) {
+//						car_vx = sensor_fusion[closest_id][CAR_VX];
+//						car_vy = sensor_fusion[closest_id][CAR_VY];
+//            closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+//						target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
+//					} else {
+//						closest_front = numeric_limits<double>::max();
+//            target_velocity = 49;
+//					}
+//
+//					double target_vs = max_s_diff;
+//					if (closest_front < CLOSE_DISTANCE) {
+//						target_vs = target_velocity * .44704/50;
+//					}
 
 					/***********************************************
   				 * Define vs
@@ -789,18 +791,22 @@ int main() {
 						car_vs = VS[consumered_steps];
 					}
 
+          car_telemetry_t car_telemetry = {car_x, car_y, car_s, car_d, car_yaw, car_speed};
+					traj_params_t traj_params = realize_stay_lane(car_telemetry, sensor_fusion, car_vs);
+
 					/***********************************************
   				 * Define target d_end and vd
   				 ***********************************************/
-					int lane = 2;
-					double d_end = 2 + lane * 4;
-
-					double step_dist = d_end - car_d;
-					double car_vd = step_dist/200;
+//					int lane = 2;
+//					double d_end = 2 + lane * 4;
+//
+//					double step_dist = d_end - car_d;
+//					double car_vd = step_dist/200;
 					/***********************************************
 					 * Trajectory Generation
 					 ***********************************************/
-					generate_traj(car_s, car_d, car_vs, car_vd, d_end, target_vs, VS,
+					generate_traj(car_s, car_d, car_vs,
+												traj_params.car_vd, traj_params.d_end, traj_params.target_vs, VS,
 												wp_sp, nums_step, next_x_vals, next_y_vals);
 
 //					cout << "path size: " << path_size << endl;
