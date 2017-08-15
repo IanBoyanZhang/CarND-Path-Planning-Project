@@ -449,11 +449,9 @@ double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot
 //double efficiency
 
 // Generating prediction table for all
-// Design predicted table data structure
-// 3 dimensional data structure with T?
 double predict(const vector<vector<double> >& sensor_fusion,
-							 const double t_inc, const double T, traj_xy_t ego_traj,
-							 const vector<tk::spline>wp_sp) {
+							 const double t_inc, const double T, traj_xy_t ego_traj) {
+
 	// vector< vector<double> > filtered;
 	// To achieve that
 	double x, y, vx, vy, s, d, id;
@@ -630,9 +628,16 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 	traj_xy.x.push_back(car_telemetry.car_x);
 	traj_xy.y.push_back(car_telemetry.car_y);
 
+	double t_inc = 0.02;
+  double T = 1;
+
 	generate_traj(car_s, car_d, car_vs,
 								traj_params.car_vd, traj_params.d_end, traj_params.target_vs, traj_xy._VS,
 								wp_sp, nums_step, traj_xy.x, traj_xy.y);
+
+  double cost = 0;
+//	double cost = predict(sensor_fusion, t_inc, T, traj_xy);
+	cout << "cost: " << cost << endl;
 
 	// Calculate costs
 	return traj_xy;
@@ -807,8 +812,8 @@ int main() {
           car_telemetry_t car_telemetry = {car_x, car_y, car_s, car_d, car_yaw, car_speed};
           traj_xy_t traj_xy = plan(car_vs, car_telemetry, sensor_fusion, wp_sp);
 
-//					cout << "path size: " << path_size << endl;
-//          cout << "end of packets <<<<<<<<<< " << endl;
+					cout << "path size: " << path_size << endl;
+          cout << "end of packets <<<<<<<<<< " << endl;
 
 					VS = traj_xy._VS;
 					msgJson["next_x"] = traj_xy.x;
