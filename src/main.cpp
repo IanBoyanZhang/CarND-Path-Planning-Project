@@ -525,6 +525,7 @@ traj_params_t realize_stay_lane(car_telemetry_t car_telemetry,
 	/***********************************************
 	 * Define target d_end and vd
    ***********************************************/
+	// TODO: Dynamically decide the lane the car will be driving
   int lane = 2;
 //	int lane = int((car_d - 2)/4);
 	double d_end = 2 + lane * 4;
