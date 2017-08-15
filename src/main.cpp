@@ -77,6 +77,7 @@ struct car_telemetry_t {
 struct traj_xy_t {
 	vector<double> x;
 	vector<double> y;
+	vector<double> _VS;
 };
 
 struct traj_params_t {
@@ -445,6 +446,8 @@ double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot
   return 0;
 }
 
+//double efficiency
+
 // Generating prediction table for all
 // Design predicted table data structure
 // 3 dimensional data structure with T?
@@ -495,6 +498,7 @@ double predict(const vector<vector<double> >& sensor_fusion,
   return cost;
 }
 
+
 // FSM
 // lane or d?
 // sensor_fusion or sensor_fusion_snapshot
@@ -506,9 +510,9 @@ double predict(const vector<vector<double> >& sensor_fusion,
  * @return
  */
 // TODO: maybe the self lane keeping method is buggy?
-traj_params_t realize_stay_lane(car_telemetry_t car_telemetry,
-																const vector<vector<double>>& sensor_fusion,
-																double car_vs) {
+// Causing the car to jump from time to time? Acceleration
+traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
+																const vector<vector<double>>& sensor_fusion) {
 	double car_s = car_telemetry.car_s;
 	double car_d = car_telemetry.car_d;
 
@@ -590,7 +594,7 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 
 		dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
 		while (dist_inc > MAX_DIST_DIFF) {
-			car_vs *= 0.8;
+			car_vs *= 0.95;
 			ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
 			ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
 			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
@@ -600,9 +604,38 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 		pred_car_s += car_vs;
 		pred_car_d += car_vd;
 
-		next_x_vals.push_back(next_x_vals[i - 1] + ego_xy_next[0] -  ego_xy[0]);
-		next_y_vals.push_back(next_y_vals[i - 1] + ego_xy_next[1] -  ego_xy[1]);
+		next_x_vals.push_back(next_x_vals[i - 1] + ego_xy_next[0] - ego_xy[0]);
+		next_y_vals.push_back(next_y_vals[i - 1] + ego_xy_next[1] - ego_xy[1]);
 	}
+}
+
+// Planner
+traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector<double> >& sensor_fusion,
+				 vector<tk::spline> wp_sp) {
+
+  // TODO: makes this a macro?
+	double nums_step = 50;
+	// FSM
+	// Calculate costs
+
+	double car_x = car_telemetry.car_x;
+  double car_y = car_telemetry.car_y;
+	double car_s = car_telemetry.car_s;
+	double car_d = car_telemetry.car_d;
+
+	// Keep lane
+	int STATE = 0;
+	traj_params_t traj_params = propose_stay_lane(car_vs, car_telemetry, sensor_fusion);
+	traj_xy_t traj_xy;
+	traj_xy.x.push_back(car_telemetry.car_x);
+	traj_xy.y.push_back(car_telemetry.car_y);
+
+	generate_traj(car_s, car_d, car_vs,
+								traj_params.car_vd, traj_params.d_end, traj_params.target_vs, traj_xy._VS,
+								wp_sp, nums_step, traj_xy.x, traj_xy.y);
+
+	// Calculate costs
+	return traj_xy;
 }
 
 int main() {
@@ -657,11 +690,12 @@ int main() {
 	vector<double> VS = {0};
 
   h.onMessage([&max_s, &initialized, &t_begin, &Ptg, &Utils,
-											&prev_JMT_s_coeffs,
-											&prev_JMT_d_coeffs,
-					&VS,
-											&map_waypoints_x,&map_waypoints_y,&map_waypoints_s,&map_waypoints_dx,&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
-                     uWS::OpCode opCode) {
+											&prev_JMT_s_coeffs, &prev_JMT_d_coeffs, &VS,
+											&map_waypoints_x,
+											&map_waypoints_y,
+											&map_waypoints_s,
+											&map_waypoints_dx,
+											&map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -750,14 +784,11 @@ int main() {
 												map_waypoints_x, map_waypoints_y,
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
-
           // Proposed start Horizon
 					next_x_vals.push_back(car_x);
 					next_y_vals.push_back(car_y);
-
 					// Refining dt with real time calc?
 //					double DT = 0.02;
-
           /********************
            * Preliminary Behavior Planner
            * To follow single line, going straight, just slowing down
@@ -781,26 +812,30 @@ int main() {
 					}
 
           car_telemetry_t car_telemetry = {car_x, car_y, car_s, car_d, car_yaw, car_speed};
-					traj_params_t traj_params = realize_stay_lane(car_telemetry, sensor_fusion, car_vs);
+//					traj_params_t traj_params = propose_stay_lane(car_vs, car_telemetry, sensor_fusion);
 
 					/***********************************************
 					 * Trajectory Generation
 					 ***********************************************/
-					generate_traj(car_s, car_d, car_vs,
-												traj_params.car_vd, traj_params.d_end, traj_params.target_vs, VS,
-												wp_sp, nums_step, next_x_vals, next_y_vals);
+//					generate_traj(car_s, car_d, car_vs,
+//												traj_params.car_vd, traj_params.d_end, traj_params.target_vs, VS,
+//												wp_sp, nums_step, next_x_vals, next_y_vals);
+          traj_xy_t traj_xy = plan(car_vs, car_telemetry, sensor_fusion, wp_sp);
 
 //					cout << "path size: " << path_size << endl;
 //          cout << "end of packets <<<<<<<<<< " << endl;
 
-					msgJson["next_x"] = next_x_vals;
-					msgJson["next_y"] = next_y_vals;
+					VS = traj_xy._VS;
+					msgJson["next_x"] = traj_xy.x;
+					msgJson["next_y"] = traj_xy.y;
+//					msgJson["next_x"] = next_x_vals;
+//					msgJson["next_y"] = next_y_vals;
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
 					//this_thread::sleep_for(chrono::milliseconds(1000));
 					ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
-          
+
         }
       } else {
         // Manual driving
