@@ -784,19 +784,12 @@ int main() {
 												map_waypoints_x, map_waypoints_y,
 												map_waypoints_dx, map_waypoints_dy,
 												max_s);
+
           // Proposed start Horizon
-					next_x_vals.push_back(car_x);
-					next_y_vals.push_back(car_y);
+//					next_x_vals.push_back(car_x);
+//					next_y_vals.push_back(car_y);
 					// Refining dt with real time calc?
 //					double DT = 0.02;
-          /********************
-           * Preliminary Behavior Planner
-           * To follow single line, going straight, just slowing down
-           * 1. check collision in front
-           * 2. figure out the right speed
-           *
-           * sensor[id][0, 1, 2...]
-           ********************/
 					/***********************************************
   				 * Define vs
   				 ***********************************************/
@@ -812,14 +805,6 @@ int main() {
 					}
 
           car_telemetry_t car_telemetry = {car_x, car_y, car_s, car_d, car_yaw, car_speed};
-//					traj_params_t traj_params = propose_stay_lane(car_vs, car_telemetry, sensor_fusion);
-
-					/***********************************************
-					 * Trajectory Generation
-					 ***********************************************/
-//					generate_traj(car_s, car_d, car_vs,
-//												traj_params.car_vd, traj_params.d_end, traj_params.target_vs, VS,
-//												wp_sp, nums_step, next_x_vals, next_y_vals);
           traj_xy_t traj_xy = plan(car_vs, car_telemetry, sensor_fusion, wp_sp);
 
 //					cout << "path size: " << path_size << endl;
