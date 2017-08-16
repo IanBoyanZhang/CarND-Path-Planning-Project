@@ -48,6 +48,8 @@ const double PID_P = 0.01;
 // OUT OF LANE
 
 // static double COLLISION = 1e6;
+static double EFFICIENCY = 1e2;
+
 struct ego_xy_t {
   double x;
   double y;
@@ -435,8 +437,13 @@ double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot
   return 0;
 }
 
-double inefficiency_cost() {
-	return 0;
+double inefficiency_cost(traj_xy_t traj_xy) {
+  double average_speed = accumulate(traj_xy._VS.begin(), traj_xy._VS.end(), 0.0)/traj_xy._VS.size();
+  double speed_diff = MAX_DIST_DIFF - average_speed;
+
+	double pct = speed_diff / MAX_DIST_DIFF;
+  double multiplier = pow(pct, 2);
+	return multiplier * EFFICIENCY;
 }
 
 // Generating prediction table for all
@@ -454,12 +461,10 @@ double predict(const vector<vector<double> >& sensor_fusion,
 
   // Calculate multiple costs
 	double cost = 0;
-	ego_xy_t ego;
 
 	double time_till_collision = numeric_limits<double>::max();
 	for (int i = 0; i < nums_steps; i+=1) {
 		t = i * t_inc;
-    ego = {ego_traj.x[i], ego_traj.y[i]};
   	for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
 			x = sensor_fusion[i][CAR_X];
@@ -476,15 +481,15 @@ double predict(const vector<vector<double> >& sensor_fusion,
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
 			future_y = y + vy * t;
       future_x = x + vx * t;
-			ego = {ego_xy[0], ego_xy[1]};
       // In same lane or not
-			if (collides_with(future_x, future_y, ego.x, ego.y)) {
+			if (collides_with(future_x, future_y, ego_traj.x[t], ego_traj.y[t])) {
 				time_till_collision = min(t_inc * i, time_till_collision);
 			}
 		}
 	}
 
-	cost += collision_cost(time_till_collision);
+//	cost += collision_cost(time_till_collision);
+//  cost += inefficiency_cost();
   return cost;
 }
 
