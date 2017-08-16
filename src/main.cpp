@@ -8,7 +8,6 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "json.hpp"
-//#include "BehaviorPlanner.h"
 #include <limits>
 #include "spline.h"
 #include "PTG.h"
@@ -335,6 +334,10 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 	return {wp_sp_x, wp_sp_y, wp_sp_dx, wp_sp_dy};
 }
 
+int which_lane(double d) {
+	return int(d / 4);
+}
+
 /*****************************************************************
  * Coordinate transformation
  *****************************************************************/
@@ -446,6 +449,11 @@ double inefficiency_cost(traj_xy_t traj_xy) {
 	return multiplier * EFFICIENCY;
 }
 
+// Lane preference cost
+double lane_preference_cost(traj_xy_t traj_xy) {
+
+}
+
 // Generating prediction table for all
 double predict(const vector<vector<double> >& sensor_fusion,
 							 const double t_inc, const double T, traj_xy_t ego_traj) {
@@ -537,6 +545,9 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
 
 	double step_dist = d_end - car_d;
 	double car_vd = step_dist/200;
+
+	cout << "d: " << car_d << endl;
+	cout << "which lane: " << which_lane(car_d) << endl;
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
   return traj_params;
