@@ -408,23 +408,11 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 	return min_id;
 }
 
-//double find_collision_point(const vector<vector<double> >& sensor_fusion_snapshot,
-//											const double t_inc, const double T, const ego_xy_t ego) {
-//  double future_x, future_y;
-//
-//	double time_till_collision = numeric_limits<double>::max();
-//	for (auto i = 0; i < sensor_fusion_snapshot.size(); i+=1) {
-//		future_x = sensor_fusion_snapshot[i][CAR_X];
-//		future_y = sensor_fusion_snapshot[i][CAR_Y];
-//		if (collides_with(future_x, future_y, ego.x, ego.y) <= COLLISION_DISTANCE) {
-//			time_till_collision = min(t_inc * i, time_till_collision);
-//		}
-//	}
-//	double exponent = pow(time_till_collision, 2);
-//	double mult = exp(-exponent);
-//	return mult * COLLISION;
-////  return time_till_collision;
-//}
+double collision_cost(double time_till_collision) {
+	double exponent = pow(time_till_collision, 2);
+	double mult = exp(-exponent);
+	return mult * COLLISION;
+}
 
 double max_accel_cost(const vector<vector<double> >& sensor_fusion_snapshot,
 											const double T, const double t_inc, const int i, traj_xy_t ego_traj) {
@@ -470,6 +458,7 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	double time_till_collision = numeric_limits<double>::max();
 	for (int i = 0; i < nums_steps; i+=1) {
 		t = i * t_inc;
+//		sensor_fusion_snapshot.clear();
     ego = {ego_traj.x[i], ego_traj.y[i]};
   	for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
@@ -487,7 +476,7 @@ double predict(const vector<vector<double> >& sensor_fusion,
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
 			future_y = y + vy * t;
       future_x = x + vx * t;
-
+//			sensor_fusion_snapshot.push_back({id, future_x, future_y});
 			// Going through all cost functions
       // Find collision point
 			ego = {ego_xy[0], ego_xy[1]};
@@ -498,7 +487,7 @@ double predict(const vector<vector<double> >& sensor_fusion,
 		}
 	}
 
-  cout << "Time to collision: " << time_till_collision << endl;
+	cost += collision_cost(time_till_collision);
   // Return cost
   return cost;
 }
@@ -643,7 +632,7 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 
   double cost = 0;
 	cost = predict(sensor_fusion, t_inc, T, traj_xy);
-//	cout << "cost: " << cost << endl;
+	cout << "cost: " << cost << endl;
 
 	// Calculate costs
 	return traj_xy;
