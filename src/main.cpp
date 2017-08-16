@@ -578,7 +578,8 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
   double d_end = lane_to_d(lane);
 
 	double step_dist = d_end - car_d;
-	double car_vd = step_dist/200;
+//	double car_vd = step_dist/200;
+	double car_vd = step_dist/400;
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
   return traj_params;
@@ -615,7 +616,8 @@ traj_params_t propose_change_lane(double car_vs, car_telemetry_t car_telemetry,
 	target_vs = target_velocity * .44704/50;
 
   double step_dist = d_end - car_d;
-	double car_vd = step_dist/200;
+	// double car_vd = step_dist/200;
+	double car_vd = step_dist/400;
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs };
 	return traj_params;
