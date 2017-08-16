@@ -35,9 +35,9 @@ using namespace std;
 
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 15;
+const double CLOSE_DISTANCE = 10;
 const double DETECTION_DISTANCE = 50;
-const double COLLISION_DISTANCE = 3.8;
+const double COLLISION_DISTANCE = 4.2;
 
 const double MAX_DIST_DIFF = 0.427;
 
@@ -579,7 +579,7 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
 
 	double step_dist = d_end - car_d;
 //	double car_vd = step_dist/200;
-	double car_vd = step_dist/400;
+	double car_vd = step_dist/2800;
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
   return traj_params;
@@ -617,7 +617,7 @@ traj_params_t propose_change_lane(double car_vs, car_telemetry_t car_telemetry,
 
   double step_dist = d_end - car_d;
 	// double car_vd = step_dist/200;
-	double car_vd = step_dist/400;
+	double car_vd = step_dist/2800;
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs };
 	return traj_params;

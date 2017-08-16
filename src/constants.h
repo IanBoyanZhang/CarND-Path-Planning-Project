@@ -50,8 +50,8 @@ static double SIGMA_D[3] = {1.0, 1.0, 1.0};
 static double MOVE_TO_LEFT_LANE = 5;
 static double COLLISION = 1e6;
 // Distance
-static double DESIRED_BUFFER = 30;
-static double DANGER = 1e5;
+static double DESIRED_BUFFER = 80;
+static double DANGER = 1e4;
 
 // States definition
 /*
