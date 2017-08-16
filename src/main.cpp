@@ -29,6 +29,9 @@ using namespace std;
 #define P_CAR_X 1
 #define P_CAR_Y 2
 
+const double MAX_LANE_ID = 2;
+const double MIN_LANE_ID = 0;
+
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 1;
 const double CLOSE_DISTANCE = 23;
@@ -339,6 +342,23 @@ int which_lane(double d) {
 	return int(d / 4);
 }
 
+/**
+ *
+ * @param lane
+ * @return lane center d
+ */
+double lane_to_d(int lane) {
+	return double(2 + lane * 4);
+}
+
+bool can_go_left(double d) {
+	return (which_lane(d) - 1) >= MIN_LANE_ID;
+}
+
+bool can_go_right(double d) {
+	return (which_lane(d) + 1) <= MAX_LANE_ID;
+}
+
 /*****************************************************************
  * Coordinate transformation
  *****************************************************************/
@@ -496,8 +516,8 @@ double predict(const vector<vector<double> >& sensor_fusion, const double t_inc,
 	}
 
 //	cost += collision_cost(time_till_collision);
-//  cost += inefficiency_cost(ego_traj);
-  cost += lane_preference_cost(car_telemetry.car_d);
+  cost += inefficiency_cost(ego_traj);
+//  cost += lane_preference_cost(car_telemetry.car_d);
   return cost;
 }
 
@@ -541,8 +561,9 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
 	 * Define target d_end and vd
    ***********************************************/
 	// TODO: Dynamically decide the lane the car will be driving
-  int lane = 2;
-//	int lane = int((car_d - 2)/4);
+//  int lane = 2;
+  int lane = which_lane(car_d);
+  // Lane to d
 	double d_end = 2 + lane * 4;
 
 	double step_dist = d_end - car_d;
@@ -553,6 +574,18 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
   return traj_params;
+}
+
+traj_params_t propose_change_lane(double car_vs, car_telemetry_t car_telemetry,
+																	const vector<vector<double> >& sensor_fusion) {
+  // Left or right?
+  double car_s = car_telemetry.car_s;
+	double car_d = car_telemetry.car_d;
+
+	int lane = which_lane(car_d);
+	traj_params_t traj_params;
+//	double car_vx, car_vy;
+	return traj_params;
 }
 
 void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd, double& d_end,
@@ -640,11 +673,24 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 	generate_traj(car_s, car_d, car_vs, traj_params.car_vd, traj_params.d_end,
 								traj_params.target_vs, traj_xy, wp_sp, nums_step);
 
-  double cost = 0;
-	cost = predict(sensor_fusion, t_inc, T, traj_xy, car_telemetry);
-	cout << "cost: " << cost << endl;
+  double cost_stay_lane = 0;
+	cost_stay_lane = predict(sensor_fusion, t_inc, T, traj_xy, car_telemetry);
+	cout << "cost: " << cost_stay_lane << endl;
 
-	// Calculate costs
+  // Change lane, left?
+	STATE = 1;
+
+	if (can_go_left(car_d)) {
+
+    // propose_change_lane_left
+	}
+
+	STATE = 2;
+
+	if (can_go_right(car_d)) {
+
+	}
+
 	return traj_xy;
 }
 
