@@ -435,7 +435,9 @@ double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot
   return 0;
 }
 
-//double efficiency
+double inefficiency_cost() {
+	return 0;
+}
 
 // Generating prediction table for all
 double predict(const vector<vector<double> >& sensor_fusion,
@@ -537,10 +539,9 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
   return traj_params;
 }
 
-void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
-									 double& d_end, double target_vs, vector<double>& VS,
-									 vector<tk::spline> wp_sp, int nums_step, vector<double>& next_x_vals, vector<double>& next_y_vals) {
-	VS.clear();
+void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd, double& d_end,
+									 double target_vs, traj_xy_t& traj_xy, vector<tk::spline> wp_sp, int nums_step) {
+	traj_xy._VS.clear();
   double vs_diff = 0.0005;
 	double pred_car_s = car_s;
   double pred_car_d = car_d;
@@ -587,12 +588,12 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
 		}
 
-		VS.push_back(car_vs);
+		traj_xy._VS.push_back(car_vs);
 		pred_car_s += car_vs;
 		pred_car_d += car_vd;
 
-		next_x_vals.push_back(next_x_vals[i - 1] + ego_xy_next[0] - ego_xy[0]);
-		next_y_vals.push_back(next_y_vals[i - 1] + ego_xy_next[1] - ego_xy[1]);
+		traj_xy.x.push_back(traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0]);
+		traj_xy.y.push_back(traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1]);
 	}
 }
 
@@ -620,9 +621,8 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 	double t_inc = 0.02;
   double T = 1;
 
-	generate_traj(car_s, car_d, car_vs,
-								traj_params.car_vd, traj_params.d_end, traj_params.target_vs, traj_xy._VS,
-								wp_sp, nums_step, traj_xy.x, traj_xy.y);
+	generate_traj(car_s, car_d, car_vs, traj_params.car_vd, traj_params.d_end,
+								traj_params.target_vs, traj_xy, wp_sp, nums_step);
 
   double cost = 0;
 	cost = predict(sensor_fusion, t_inc, T, traj_xy);
