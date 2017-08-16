@@ -53,6 +53,8 @@ const double PID_P = 0.01;
 // static double COLLISION = 1e6;
 static double EFFICIENCY = 1e2;
 // static double MOVE_TO_LEFT_LANE = 5;
+//static double DESIRED_BUFFER = 40;
+
 
 struct ego_xy_t {
   double x;
@@ -451,18 +453,19 @@ double collision_cost(double time_till_collision) {
 //  return 0;
 //}
 
-double buffer_cost(const vector<vector<double> >& sensor_fusion, const double t_inc,
-									 const double T, const int i, const ego_xy_t ego, car_telemetry_t car_telemetry) {
+double buffer_to_front_cost(const vector<vector<double> >& sensor_fusion,
+														car_telemetry_t car_telemetry, double d_end) {
 	double car_s = car_telemetry.car_s;
-	double car_d = car_telemetry.car_d;
 
-	int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
-//	double closest_front = ;
-	double target_velocity;
+	int closest_id = closest_car_in_front(sensor_fusion, car_s, d_end);
+  double closest_front = numeric_limits<double>::max();
 
-//	if (closest_front != -1) {
-//	}
-	return 0;
+	if (closest_id != -1) {
+    closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+	}
+  if (closest_front > DESIRED_BUFFER) { return 0.0; }
+	double multiplier = 1.0 - pow((closest_front/DESIRED_BUFFER), 2);
+	return multiplier * DANGER;
 }
 
 //double calculate_all_costs(const vector<vector<double> >& sensor_fusion_snapshot,
@@ -486,7 +489,7 @@ double lane_preference_cost(double d) {
 
 // Generating prediction table for all
 double predict(const vector<vector<double> >& sensor_fusion, const double t_inc, const double T,
-							 traj_xy_t ego_traj, traj_params_t traj_params) {
+							 traj_xy_t ego_traj, traj_params_t traj_params, car_telemetry_t car_telemetry) {
 
 	// vector< vector<double> > filtered;
 	// To achieve that
@@ -526,6 +529,7 @@ double predict(const vector<vector<double> >& sensor_fusion, const double t_inc,
 
 	cost += collision_cost(time_till_collision);
   cost += inefficiency_cost(ego_traj);
+  cost += buffer_to_front_cost(sensor_fusion, car_telemetry, traj_params.d_end);
 //  cost += lane_preference_cost(traj_params.d_end);
   return cost;
 }
@@ -659,12 +663,12 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 		ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
 
 		dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
-		while (dist_inc > MAX_DIST_DIFF) {
-			car_vs *= 0.95;
+//		while (dist_inc > MAX_DIST_DIFF) {
+//			car_vs *= 0.95;
 			ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
 			ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
-			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
-		}
+//			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
+//		}
 
 		traj_xy._VS.push_back(car_vs);
 		pred_car_s += car_vs;
@@ -714,7 +718,7 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 	generate_traj(car_s, car_d, car_vs, traj_params.car_vd, traj_params.d_end,
 								traj_params.target_vs, traj_xy, wp_sp, nums_step);
 
-	cost_stay_lane = predict(sensor_fusion, t_inc, T, traj_xy, traj_params);
+	cost_stay_lane = predict(sensor_fusion, t_inc, T, traj_xy, traj_params, car_telemetry);
 	cout << "cost: KEEP:  " << cost_stay_lane << endl;
 
   // Change lane, left?
@@ -729,7 +733,7 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
 									traj_params.d_end, traj_params.target_vs, traj_xy_left, wp_sp, nums_step);
 
-		cost_change_left = predict(sensor_fusion, t_inc, T, traj_xy_left, traj_params);
+		cost_change_left = predict(sensor_fusion, t_inc, T, traj_xy_left, traj_params, car_telemetry);
 		cout << "cost: Change LEFT: " << cost_change_left << endl;
 	}
 
@@ -745,7 +749,7 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
 									traj_params.d_end, traj_params.target_vs, traj_xy_right, wp_sp, nums_step);
 
-		cost_change_right = predict(sensor_fusion, t_inc, T, traj_xy_right, traj_params);
+		cost_change_right = predict(sensor_fusion, t_inc, T, traj_xy_right, traj_params, car_telemetry);
 		cout << "cost: Change RIGHT: " << cost_change_right << endl;
 	}
 
