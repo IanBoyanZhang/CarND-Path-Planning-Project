@@ -474,8 +474,6 @@ double predict(const vector<vector<double> >& sensor_fusion,
 			s = sensor_fusion[i][CAR_S];
 			d = sensor_fusion[i][CAR_D];
 			// check lane distance
-    	// Adjacent lane cars
-			// Check when collision will happen
 			vector<double> ego_xy = {ego_traj.x[t], ego_traj.y[t]};
 			// Check L2 distanceHopefully, there are more opportunities in the future.
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
@@ -489,7 +487,7 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	}
 
 //	cost += collision_cost(time_till_collision);
-//  cost += inefficiency_cost();
+  cost += inefficiency_cost(ego_traj);
   return cost;
 }
 
