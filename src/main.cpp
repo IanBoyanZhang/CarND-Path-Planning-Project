@@ -446,7 +446,6 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	double x, y, vx, vy, s, d, id;
 
 	double future_x, future_y;
-//	vector<vector<double> > sensor_fusion_snapshot;
 
 	int nums_steps = (int)T/t_inc;
 	double t = 0;
@@ -458,7 +457,6 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	double time_till_collision = numeric_limits<double>::max();
 	for (int i = 0; i < nums_steps; i+=1) {
 		t = i * t_inc;
-//		sensor_fusion_snapshot.clear();
     ego = {ego_traj.x[i], ego_traj.y[i]};
   	for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
@@ -476,9 +474,6 @@ double predict(const vector<vector<double> >& sensor_fusion,
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
 			future_y = y + vy * t;
       future_x = x + vx * t;
-//			sensor_fusion_snapshot.push_back({id, future_x, future_y});
-			// Going through all cost functions
-      // Find collision point
 			ego = {ego_xy[0], ego_xy[1]};
       // In same lane or not
 			if (collides_with(future_x, future_y, ego.x, ego.y)) {
@@ -488,7 +483,6 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	}
 
 	cost += collision_cost(time_till_collision);
-  // Return cost
   return cost;
 }
 
