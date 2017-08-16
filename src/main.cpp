@@ -35,9 +35,9 @@ using namespace std;
 
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 23;
+const double CLOSE_DISTANCE = 15;
 const double DETECTION_DISTANCE = 50;
-const double COLLISION_DISTANCE = 4.2;
+const double COLLISION_DISTANCE = 3.8;
 
 const double MAX_DIST_DIFF = 0.427;
 
@@ -519,7 +519,6 @@ double predict(const vector<vector<double> >& sensor_fusion, const double t_inc,
       future_x = x + vx * t;
       // In same lane or not
 			if (collides_with(future_x, future_y, ego_traj.x[t], ego_traj.y[t])) {
-        cout << "Proposed will collide! " << endl;
 				time_till_collision = min(t_inc * i, time_till_collision);
 			}
 		}
@@ -527,7 +526,7 @@ double predict(const vector<vector<double> >& sensor_fusion, const double t_inc,
 
 	cost += collision_cost(time_till_collision);
   cost += inefficiency_cost(ego_traj);
-  cost += lane_preference_cost(traj_params.d_end);
+//  cost += lane_preference_cost(traj_params.d_end);
   return cost;
 }
 
@@ -671,8 +670,19 @@ void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd,
 		pred_car_s += car_vs;
 		pred_car_d += car_vd;
 
-		traj_xy.x.push_back(traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0]);
-		traj_xy.y.push_back(traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1]);
+    double l_x = traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0];
+		double l_y = traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1];
+
+//		cout << "l_x: " << l_x << endl;
+//		cout << "l_y: " << l_y << endl;
+
+//    cout << "car_s: " << pred_car_s << endl;
+//		cout << "car_d: " << pred_car_d << endl;
+
+//		traj_xy.x.push_back(traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0]);
+//		traj_xy.y.push_back(traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1]);
+    traj_xy.x.push_back(l_x);
+		traj_xy.y.push_back(l_y);
 	}
 }
 
@@ -690,48 +700,74 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 	double car_s = car_telemetry.car_s;
 	double car_d = car_telemetry.car_d;
 
-	// Keep lane
-	int STATE = 0;
-	traj_params_t traj_params = propose_stay_lane(car_vs, car_telemetry, sensor_fusion);
-	traj_xy_t traj_xy;
-	traj_xy.x.push_back(car_telemetry.car_x);
-	traj_xy.y.push_back(car_telemetry.car_y);
-
 	double t_inc = 0.02;
   double T = 1;
+	traj_params_t traj_params;
+	// Keep lane
+	int STATE = 0;
+	traj_xy_t traj_xy;
+	traj_xy.x.push_back(car_x);
+	traj_xy.y.push_back(car_y);
+	double cost_stay_lane = numeric_limits<double>::max();
 
+	traj_params = propose_stay_lane(car_vs, car_telemetry, sensor_fusion);
 	generate_traj(car_s, car_d, car_vs, traj_params.car_vd, traj_params.d_end,
 								traj_params.target_vs, traj_xy, wp_sp, nums_step);
 
-  double cost_stay_lane = 0;
 	cost_stay_lane = predict(sensor_fusion, t_inc, T, traj_xy, traj_params);
 	cout << "cost: KEEP:  " << cost_stay_lane << endl;
 
   // Change lane, left?
 	STATE = 1;
-	traj_xy_t traj_xy_change_lane;
-  traj_xy_change_lane.x.push_back(car_telemetry.car_x);
-	traj_xy_change_lane.y.push_back(car_telemetry.car_y);
-  double cost_change_left = 0;
+	traj_xy_t traj_xy_left;
+  traj_xy_left.x.push_back(car_x);
+	traj_xy_left.y.push_back(car_y);
+  double cost_change_left = numeric_limits<double>::max();
+
 	if (can_go_left(car_d)) {
     traj_params = propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) - 1);
-
 		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
-									traj_params.d_end, traj_params.target_vs, traj_xy_change_lane, wp_sp, nums_step);
+									traj_params.d_end, traj_params.target_vs, traj_xy_left, wp_sp, nums_step);
 
-		cost_change_left = predict(sensor_fusion, t_inc, T, traj_xy_change_lane, traj_params);
+		cost_change_left = predict(sensor_fusion, t_inc, T, traj_xy_left, traj_params);
 		cout << "cost: Change LEFT: " << cost_change_left << endl;
 	}
 
-//	if (cost_change_left < cost_stay_lane) {
-//		return traj_xy_change_lane;
-//	}
+	STATE = 2;
+	traj_xy_t traj_xy_right;
+  traj_xy_right.x.push_back(car_x);
+	traj_xy_right.y.push_back(car_y);
+	double cost_change_right = numeric_limits<double>::max();
 
-//	STATE = 2;
+	if (can_go_right(car_d)) {
+		traj_params = propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) + 1);
 
-//	if (can_go_right(car_d)) {
-//		propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) + 1);
-//	}
+		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
+									traj_params.d_end, traj_params.target_vs, traj_xy_right, wp_sp, nums_step);
+
+		cost_change_right = predict(sensor_fusion, t_inc, T, traj_xy_right, traj_params);
+		cout << "cost: Change RIGHT: " << cost_change_right << endl;
+	}
+
+	vector<double> state_costs = {cost_stay_lane, cost_change_left, cost_change_right};
+
+	STATE = std::distance(state_costs.begin(), min_element(state_costs.begin(), state_costs.end()));
+
+	switch(STATE) {
+		case 0:
+      cout << "stay" << endl;
+			break;
+		case 1:
+			traj_xy = traj_xy_left;
+			cout << "change LEFT" << endl;
+			break;
+		case 2:
+			traj_xy = traj_xy_right;
+			cout << "change RIGHT" << endl;
+			break;
+		default:
+			break;
+	}
 
 	return traj_xy;
 }
@@ -884,8 +920,6 @@ int main() {
 												max_s);
 
           // Proposed start Horizon
-//					next_x_vals.push_back(car_x);
-//					next_y_vals.push_back(car_y);
 					// Refining dt with real time calc?
 //					double DT = 0.02;
 					/***********************************************
@@ -911,8 +945,6 @@ int main() {
 					VS = traj_xy._VS;
 					msgJson["next_x"] = traj_xy.x;
 					msgJson["next_y"] = traj_xy.y;
-//					msgJson["next_x"] = next_x_vals;
-//					msgJson["next_y"] = next_y_vals;
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
