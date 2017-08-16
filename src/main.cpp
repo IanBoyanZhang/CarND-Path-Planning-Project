@@ -48,6 +48,7 @@ const double PID_P = 0.01;
 
 // static double COLLISION = 1e6;
 static double EFFICIENCY = 1e2;
+// static double MOVE_TO_LEFT_LANE = 5;
 
 struct ego_xy_t {
   double x;
@@ -449,14 +450,14 @@ double inefficiency_cost(traj_xy_t traj_xy) {
 	return multiplier * EFFICIENCY;
 }
 
-// Lane preference cost
-double lane_preference_cost(traj_xy_t traj_xy) {
-
+double lane_preference_cost(double d) {
+	int lane = which_lane(d);
+	return MOVE_TO_LEFT_LANE * (lane - 0);
 }
 
 // Generating prediction table for all
-double predict(const vector<vector<double> >& sensor_fusion,
-							 const double t_inc, const double T, traj_xy_t ego_traj) {
+double predict(const vector<vector<double> >& sensor_fusion, const double t_inc, const double T,
+							 traj_xy_t ego_traj, car_telemetry_t car_telemetry) {
 
 	// vector< vector<double> > filtered;
 	// To achieve that
@@ -495,7 +496,8 @@ double predict(const vector<vector<double> >& sensor_fusion,
 	}
 
 //	cost += collision_cost(time_till_collision);
-  cost += inefficiency_cost(ego_traj);
+//  cost += inefficiency_cost(ego_traj);
+  cost += lane_preference_cost(car_telemetry.car_d);
   return cost;
 }
 
@@ -639,7 +641,7 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 								traj_params.target_vs, traj_xy, wp_sp, nums_step);
 
   double cost = 0;
-	cost = predict(sensor_fusion, t_inc, T, traj_xy);
+	cost = predict(sensor_fusion, t_inc, T, traj_xy, car_telemetry);
 	cout << "cost: " << cost << endl;
 
 	// Calculate costs
