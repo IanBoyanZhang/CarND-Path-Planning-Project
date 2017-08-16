@@ -29,11 +29,12 @@ using namespace std;
 #define P_CAR_X 1
 #define P_CAR_Y 2
 
-const double MAX_LANE_ID = 2;
-const double MIN_LANE_ID = 0;
+#define LANE_WIDTH 4
+#define MAX_LANE_ID 2;
+#define MIN_LANE_ID 0;
 
 const int NUMS_OF_CARS = 12;
-const double SAME_LANE = 1;
+const double SAME_LANE = 2;
 const double CLOSE_DISTANCE = 23;
 const double DETECTION_DISTANCE = 50;
 const double COLLISION_DISTANCE = 1.5;
@@ -339,7 +340,7 @@ vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
 }
 
 int which_lane(double d) {
-	return int(d / 4);
+	return int(d / LANE_WIDTH);
 }
 
 /**
@@ -348,7 +349,7 @@ int which_lane(double d) {
  * @return lane center d
  */
 double lane_to_d(int lane) {
-	return double(2 + lane * 4);
+	return double(2 + lane * LANE_WIDTH);
 }
 
 bool can_go_left(double d) {
@@ -379,7 +380,6 @@ vector<double> localXY2mapXY(const double car_x, const double car_y,
 }
 
 vector<double> getTargetXY(const double pos_s, const double d, const vector<tk::spline> wp_sp) {
-	const int LANE_WIDTH = 4;
 	tk::spline wp_sp_x = wp_sp[0];
 	tk::spline wp_sp_y = wp_sp[1];
 	tk::spline wp_sp_dx = wp_sp[2];
@@ -564,27 +564,50 @@ traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
 //  int lane = 2;
   int lane = which_lane(car_d);
   // Lane to d
-	double d_end = 2 + lane * 4;
+  double d_end = lane_to_d(lane);
 
 	double step_dist = d_end - car_d;
 	double car_vd = step_dist/200;
-
-	cout << "d: " << car_d << endl;
-	cout << "which lane: " << which_lane(car_d) << endl;
 
 	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
   return traj_params;
 }
 
+// TODO: change lane seems sharing most of the code with keep lane
+// Combining the functions
 traj_params_t propose_change_lane(double car_vs, car_telemetry_t car_telemetry,
-																	const vector<vector<double> >& sensor_fusion) {
+																	const vector<vector<double> >& sensor_fusion, int lane) {
   // Left or right?
   double car_s = car_telemetry.car_s;
 	double car_d = car_telemetry.car_d;
 
-	int lane = which_lane(car_d);
-	traj_params_t traj_params;
-//	double car_vx, car_vy;
+	double d_end = lane_to_d(lane);
+
+  double car_vx, car_vy;
+  // find leading car in target lane
+	int closest_id = closest_car_in_front(sensor_fusion, car_s, d_end);
+  double closest_front;
+	double target_velocity;
+
+	double target_vs;
+
+	if (closest_id != -1) {
+		car_vx = sensor_fusion[closest_id][CAR_VX];
+		car_vy = sensor_fusion[closest_id][CAR_VY];
+		closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+		target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
+    target_vs = target_velocity * .44704/50;
+	} else {
+		closest_front = numeric_limits<double>::max();
+		target_velocity = 49;
+		// Drive slower in s direction not to violate speed limit
+		target_vs = target_velocity * .95 * .44704/50;
+	}
+
+  double step_dist = d_end - car_d;
+	double car_vd = step_dist/200;
+
+	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs };
 	return traj_params;
 }
 
@@ -675,21 +698,25 @@ traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector
 
   double cost_stay_lane = 0;
 	cost_stay_lane = predict(sensor_fusion, t_inc, T, traj_xy, car_telemetry);
-	cout << "cost: " << cost_stay_lane << endl;
+	cout << "cost: KEEP:  " << cost_stay_lane << endl;
 
   // Change lane, left?
 	STATE = 1;
 
-	if (can_go_left(car_d)) {
+//  double cost_change_left = 0;
+//	if (can_go_left(car_d)) {
+//    traj_params = propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) - 1);
+//		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
+//									traj_params.d_end, traj_params.target_vs, traj_xy, wp_sp, nums_step);
+//		cost_change_left = predict(sensor_fusion, t_inc, T, traj_xy, car_telemetry);
+//		cout << "cost: Change LEFT: " << cost_change_left << endl;
+//	}
 
-    // propose_change_lane_left
-	}
+//	STATE = 2;
 
-	STATE = 2;
-
-	if (can_go_right(car_d)) {
-
-	}
+//	if (can_go_right(car_d)) {
+//		propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) + 1);
+//	}
 
 	return traj_xy;
 }
