@@ -330,27 +330,25 @@ bool can_go_right(double d) {
 /*****************************************************************
  * Coordinate transformation
  *****************************************************************/
-vector<double> map2local(const double map_x, const double map_y,
-														 const double car_x, const double car_y, const double yaw)
+vector<double> map2local(const double map_x, const double map_y, const car_pose_t car_pose)
 {
-	double x = map_x - car_x;
-	double y = map_y - car_y;
+	double x = map_x - car_pose.x;
+	double y = map_y - car_pose.y;
 
-	return {x * cos(0 - yaw) - y * sin(0 - yaw),
-					x * sin(0 - yaw) + y * cos(0 - yaw)};
+	return {x * cos(0 - car_pose.yaw) - y * sin(0 - car_pose.yaw),
+					x * sin(0 - car_pose.yaw) + y * cos(0 - car_pose.yaw)};
 }
 
-vector<double> localXY2mapXY(const double car_x, const double car_y,
-														 const double l_x, const double l_y, const double yaw){
-	return {l_x * cos(yaw) - l_y * sin(yaw) + car_x,
-					l_y * sin(yaw) + l_y * cos(yaw) + car_y};
+vector<double> local2map(const car_pose_t car_pose, const double l_x, const double l_y){
+	return {l_x * cos(car_pose.yaw) - l_y * sin(car_pose.yaw) + car_pose.x,
+					l_y * sin(car_pose.yaw) + l_y * cos(car_pose.yaw) + car_pose.y};
 }
 
 tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
 									const car_pose_t car_pose) {
 	vector<double> local_xy;
 	for(int i = 0; i < ptsx.size(); i+=1) {
-		local_xy = map2local(ptsx[i], ptsy[i], car_pose.x, car_pose.y, car_pose.yaw);
+		local_xy = map2local(ptsx[i], ptsy[i], car_pose);
 		ptsx[i] = local_xy[0];
 		ptsy[i] = local_xy[1];
 	}
@@ -876,13 +874,13 @@ int main() {
 						ptsy.push_back(ref_y_prev);
             ptsy.push_back(ref_y);
 					}
-          cout << "car_s " << car_s << endl;
+//          cout << "car_s " << car_s << endl;
 
           int lane = 1;
           get_wp_in_map(car_s, lane_to_d(1), map_waypoints_s, map_waypoints_x, map_waypoints_y, ptsx, ptsy);
 
 					car_pose_t car_pose = {ref_x, ref_y, ref_yaw};
-					tk::spline s =fit_xy(ptsx, ptsy, car_pose);
+					tk::spline s = fit_xy(ptsx, ptsy, car_pose);
 
 					vector<double> next_x_vals;
           vector<double> next_y_vals;
@@ -924,10 +922,6 @@ int main() {
 					// Test u solution
 					msgJson["next_x"] = next_x_vals;
 					msgJson["next_y"] = next_y_vals;
-
-//
-//					msgJson["next_x"] = next_x_vals;
-//					msgJson["next_y"] = next_y_vals;
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
