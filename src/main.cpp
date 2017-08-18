@@ -35,7 +35,8 @@ using namespace std;
 
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 10;
+const double CLOSE_DISTANCE = 20;
+const double BUFFER_DISTANCE = 25;
 const double DETECTION_DISTANCE = 50;
 const double COLLISION_DISTANCE = 4.2;
 
@@ -94,10 +95,8 @@ struct traj_xy_t {
 };
 
 struct traj_params_t {
-	double car_vs;
-	double car_vd;
 	double d_end;
-	double target_vs;
+	double ref_vel;
 };
 
 struct car_pose_t {
@@ -351,7 +350,7 @@ car_telemetry_t get_telemetry(json j) {
 	};
   return car_telemetry;
 }
-vector<car_pose_t> get_init_car_poses(const car_telemetry_t c) {
+vector<car_pose_t> get_init_car_poses(const car_telemetry_t& c) {
 
 	double car_x = c.car_x;
 	double car_y = c.car_y;
@@ -388,10 +387,10 @@ vector<double> map2local(const double map_x, const double map_y, const car_pose_
 					x * sin(0 - car_pose.yaw) + y * cos(0 - car_pose.yaw)};
 }
 
-vector<double> local2map(const car_pose_t car_pose, const double l_x, const double l_y){
-	return {l_x * cos(car_pose.yaw) - l_y * sin(car_pose.yaw) + car_pose.x,
-					l_y * sin(car_pose.yaw) + l_y * cos(car_pose.yaw) + car_pose.y};
-}
+//vector<double> local2map(const car_pose_t car_pose, const double l_x, const double l_y){
+//	return {l_x * cos(car_pose.yaw) - l_y * sin(car_pose.yaw) + car_pose.x,
+//					l_y * sin(car_pose.yaw) + l_y * cos(car_pose.yaw) + car_pose.y};
+//}
 
 tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
 									const car_pose_t car_pose) {
@@ -404,26 +403,6 @@ tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
 	tk::spline s;
 	s.set_points(ptsx, ptsy);
 	return s;
-}
-
-vector<double> getTargetXY(const double pos_s, const double d, const vector<tk::spline> wp_sp) {
-	tk::spline wp_sp_x = wp_sp[0];
-	tk::spline wp_sp_y = wp_sp[1];
-	tk::spline wp_sp_dx = wp_sp[2];
-	tk::spline wp_sp_dy = wp_sp[3];
-
-	double x = wp_sp_x(pos_s);
-	double y = wp_sp_y(pos_s);
-	double dx = wp_sp_dx(pos_s);
-	double dy = wp_sp_dy(pos_s);
-
-	/**
-	 * lane = 0, 1, 2
-	 */
-//	const int d = 2 + lane * 4;
-
-	//return {x + d * dx/1000, y + d * dy/1000};
-	return {x + d * dx, y + d * dy};
 }
 
 /**************************************************
@@ -498,65 +477,24 @@ double buffer_to_front_cost(const vector<vector<double> >& sensor_fusion,
 //  return 0;
 //}
 
-double inefficiency_cost(traj_xy_t traj_xy) {
-  double average_speed = accumulate(traj_xy._VS.begin(), traj_xy._VS.end(), 0.0)/traj_xy._VS.size();
-  double speed_diff = MAX_DIST_DIFF - average_speed;
-
-	double pct = speed_diff / MAX_DIST_DIFF;
-  double multiplier = pow(pct, 2);
+double inefficiency_cost(const double ref_vel) {
+	double pct = (49.5 - ref_vel) / 49.5;
+	double multiplier = pow(pct, 2);
 	return multiplier * EFFICIENCY;
 }
+
+//double inefficiency_cost(traj_xy_t traj_xy) {
+//  double average_speed = accumulate(traj_xy._VS.begin(), traj_xy._VS.end(), 0.0)/traj_xy._VS.size();
+//  double speed_diff = MAX_DIST_DIFF - average_speed;
+//
+//	double pct = speed_diff / MAX_DIST_DIFF;
+//  double multiplier = pow(pct, 2);
+//	return multiplier * EFFICIENCY;
+//}
 
 double lane_preference_cost(double d) {
 	int lane = which_lane(d);
 	return MOVE_TO_LEFT_LANE * (lane - 0);
-}
-
-// Generating prediction table for all
-double predict(const vector<vector<double> >& sensor_fusion, const double t_inc, const double T,
-							 traj_xy_t ego_traj, traj_params_t traj_params, car_telemetry_t car_telemetry) {
-
-	// vector< vector<double> > filtered;
-	// To achieve that
-	double x, y, vx, vy, s, d, id;
-
-	double future_x, future_y;
-
-	int nums_steps = (int)T/t_inc;
-	double t = 0;
-
-  // Calculate multiple costs
-	double cost = 0;
-
-	double time_till_collision = numeric_limits<double>::max();
-	for (int i = 0; i < nums_steps; i+=1) {
-		t = i * t_inc;
-  	for (auto i = 0; i < sensor_fusion.size(); i+=1) {
-			id = sensor_fusion[i][CAR_ID];
-			x = sensor_fusion[i][CAR_X];
-			y = sensor_fusion[i][CAR_Y];
-			vx = sensor_fusion[i][CAR_VX];
-			vy = sensor_fusion[i][CAR_VY];
-			s = sensor_fusion[i][CAR_S];
-			d = sensor_fusion[i][CAR_D];
-			// check lane distance
-			vector<double> ego_xy = {ego_traj.x[t], ego_traj.y[t]};
-			// Check L2 distanceHopefully, there are more opportunities in the future.
-			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
-			future_y = y + vy * t;
-      future_x = x + vx * t;
-      // In same lane or not
-			if (collides_with(future_x, future_y, ego_traj.x[t], ego_traj.y[t])) {
-				time_till_collision = min(t_inc * i, time_till_collision);
-			}
-		}
-	}
-
-	cost += collision_cost(time_till_collision);
-  cost += inefficiency_cost(ego_traj);
-  cost += buffer_to_front_cost(sensor_fusion, car_telemetry, traj_params.d_end);
-//  cost += lane_preference_cost(traj_params.d_end);
-  return cost;
 }
 
 // FSM
@@ -571,242 +509,123 @@ double predict(const vector<vector<double> >& sensor_fusion, const double t_inc,
  */
 // TODO: maybe the self lane keeping method is buggy?
 // Causing the car to jump from time to time? Acceleration
-traj_params_t propose_stay_lane(double car_vs, car_telemetry_t car_telemetry,
+double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
 																const vector<vector<double>>& sensor_fusion) {
-	double car_s = car_telemetry.car_s;
-	double car_d = car_telemetry.car_d;
-
-  double car_vx, car_vy;
-	int closest_id = closest_car_in_front(sensor_fusion, car_s, car_d);
+	double ego_s = c.car_s;
+//	double ego_d = c.car_d;
+	double ego_d = d;
+	double car_x, car_y;
+	double car_vx, car_vy;
+	int closest_id = closest_car_in_front(sensor_fusion, ego_s, ego_d);
 	double closest_front = numeric_limits<double>::max();
-	double target_velocity = 49;
+	double target_velocity = 49.5;
+  double ref_vel = target_velocity;
 	if (closest_id != -1) {
 		car_vx = sensor_fusion[closest_id][CAR_VX];
 		car_vy = sensor_fusion[closest_id][CAR_VY];
-		closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
+		closest_front = (double)sensor_fusion[closest_id][CAR_S] - ego_s;
 		target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
 	}
 
 	// Define trajectory parameters
-	double target_vs = MAX_DIST_DIFF;
+	// Too close slow down!
+	if (closest_front < BUFFER_DISTANCE) {
+		ref_vel = c.car_speed * 0.9;
+	}
 	if (closest_front < CLOSE_DISTANCE) {
-		target_vs = target_velocity * .44704/50;
+		ref_vel = target_velocity - 1;
 	}
-//  double target_vs = target_velocity * .44704/50;
-	/***********************************************
-	 * Define target d_end and vd
-   ***********************************************/
-	// TODO: Dynamically decide the lane the car will be driving
-//  int lane = 2;
-  int lane = which_lane(car_d);
-  // Lane to d
-  double d_end = lane_to_d(lane);
 
-	double step_dist = d_end - car_d;
-//	double car_vd = step_dist/200;
-	double car_vd = step_dist/2800;
+	cout << "closest_front: " << closest_front << endl;
+	cout << "ref_vel: " << ref_vel << endl;
 
-	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs};
-  return traj_params;
+  return ref_vel;
 }
 
-// TODO: change lane seems sharing most of the code with keep lane
-// Combining the functions
-traj_params_t propose_change_lane(double car_vs, car_telemetry_t car_telemetry,
-																	const vector<vector<double> >& sensor_fusion, int lane) {
-  // Left or right?
-  double car_s = car_telemetry.car_s;
-	double car_d = car_telemetry.car_d;
-
-	double d_end = lane_to_d(lane);
-
-  double car_vx, car_vy;
-  // find leading car in target lane
-	int closest_id = closest_car_in_front(sensor_fusion, car_s, d_end);
-  double closest_front = numeric_limits<double>::max();
-	double target_velocity = 49 * .95;
-
-	if (closest_id != -1) {
-		car_vx = sensor_fusion[closest_id][CAR_VX];
-		car_vy = sensor_fusion[closest_id][CAR_VY];
-		closest_front = (double)sensor_fusion[closest_id][CAR_S] - car_s;
-		target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2));
-//    target_vs = target_velocity * .44704/50;
+traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_t car_pose, double ref_vel) {
+		traj_xy_t traj_xy;
+	for (int i = 0; i < c.previous_path_x.size(); i+=1) {
+		traj_xy.x.push_back(c.previous_path_x[i]);
+		traj_xy.y.push_back(c.previous_path_y[i]);
 	}
 
-	double target_vs = MAX_DIST_DIFF * .95;
-	if (closest_front < CLOSE_DISTANCE) {
-		target_vs = target_velocity * .44704/50;
+  double target_x = 40.0;
+	double target_y = s(target_x);
+	double target_dist = sqrt(pow(target_x, 2) + pow(target_y, 2));
+
+	double x_add_on = 0.0;
+//	double ref_vel = 49.5;
+
+	for (int i = 0; i < 50 - c.previous_path_x.size(); i+=1) {
+		double N = (target_dist/(0.02*ref_vel*0.44704));
+		double x_point = x_add_on + (target_x)/N;
+		double y_point = s(x_point);
+
+		x_add_on = x_point;
+
+		double x_ref = x_point;
+		double y_ref = y_point;
+
+		// back to global?
+		x_point = (x_ref * cos(car_pose.yaw) - y_ref * sin(car_pose.yaw)) + car_pose.x;
+		y_point = (x_ref * sin(car_pose.yaw) + y_ref * cos(car_pose.yaw)) + car_pose.y;
+		traj_xy.x.push_back(x_point);
+		traj_xy.y.push_back(y_point);
 	}
-	target_vs = target_velocity * .44704/50;
-
-  double step_dist = d_end - car_d;
-	// double car_vd = step_dist/200;
-	double car_vd = step_dist/2800;
-
-	traj_params_t traj_params = { car_vs, car_vd, d_end, target_vs };
-	return traj_params;
-}
-
-void generate_traj(double& car_s, double &car_d, double& car_vs, double &car_vd, double& d_end,
-									 double target_vs, traj_xy_t& traj_xy, vector<tk::spline> wp_sp, int nums_step) {
-	traj_xy._VS.clear();
-  double vs_diff = 0.0005;
-	double pred_car_s = car_s;
-  double pred_car_d = car_d;
-	vector<vector<double> > traj_res;
-  vector<double> ego_xy;
-	vector<double> ego_xy_next;
-
-	double dist_inc = 0;
-	for (int i = 1; i < nums_step; i+=1) {
-    // Use dynamics to predict motion?
-		double cte = pred_car_d - d_end;
-		// P term
-		if (abs(cte) >= 0.7) {
-			car_vd = 0.001 * -cte;
-		}
-		if (abs(cte) > 0.1 && abs(cte) < 0.7) {
-			car_vd = PID_P * (-cte);
-			if (abs(car_d - 2) > 30) {
-				car_d = 0;
-			}
-		}
-		// D term
-		pred_car_d += car_vd;
-		// S_control
-		double s_error = car_vs - target_vs;
-
-		if(s_error < 0) {
-			car_vs += vs_diff;
-		} else {
-			car_vs -= vs_diff;
-		}
-
-		/*****************************************************
-   	 * Caching velocity predictions for next simulator loop
-   	 *****************************************************/
-		ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
-		ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
-
-		dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
-//		while (dist_inc > MAX_DIST_DIFF) {
-//			car_vs *= 0.95;
-			ego_xy = getTargetXY(pred_car_s + car_vs, pred_car_d + car_vd, wp_sp);
-			ego_xy_next = getTargetXY(pred_car_s + car_vs * 2, pred_car_d + car_vd * 2, wp_sp);
-//			dist_inc = distance(ego_xy[0], ego_xy[1], ego_xy_next[0], ego_xy_next[1]);
-//		}
-
-		traj_xy._VS.push_back(car_vs);
-		pred_car_s += car_vs;
-		pred_car_d += car_vd;
-
-    double l_x = traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0];
-		double l_y = traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1];
-
-//		cout << "l_x: " << l_x << endl;
-//		cout << "l_y: " << l_y << endl;
-
-//    cout << "car_s: " << pred_car_s << endl;
-//		cout << "car_d: " << pred_car_d << endl;
-
-//		traj_xy.x.push_back(traj_xy.x[i - 1] + ego_xy_next[0] - ego_xy[0]);
-//		traj_xy.y.push_back(traj_xy.y[i - 1] + ego_xy_next[1] - ego_xy[1]);
-    traj_xy.x.push_back(l_x);
-		traj_xy.y.push_back(l_y);
-	}
-}
-
-//double generate_traj_xy(car_telemetry_t car_telemetry) {
-//
-//}
-
-// Planner
-traj_xy_t plan(double car_vs, car_telemetry_t car_telemetry, const vector<vector<double> >& sensor_fusion,
-				 vector<tk::spline> wp_sp) {
-
-  // TODO: makes this a macro?
-	double nums_step = 50;
-	// FSM
-	// Calculate costs
-
-	double car_x = car_telemetry.car_x;
-  double car_y = car_telemetry.car_y;
-	double car_s = car_telemetry.car_s;
-	double car_d = car_telemetry.car_d;
-
-	double t_inc = 0.02;
-  double T = 1;
-	traj_params_t traj_params;
-	// Keep lane
-	int STATE = 0;
-	traj_xy_t traj_xy;
-	traj_xy.x.push_back(car_x);
-	traj_xy.y.push_back(car_y);
-	double cost_stay_lane = numeric_limits<double>::max();
-
-	traj_params = propose_stay_lane(car_vs, car_telemetry, sensor_fusion);
-	generate_traj(car_s, car_d, car_vs, traj_params.car_vd, traj_params.d_end,
-								traj_params.target_vs, traj_xy, wp_sp, nums_step);
-
-	cost_stay_lane = predict(sensor_fusion, t_inc, T, traj_xy, traj_params, car_telemetry);
-	cout << "cost: KEEP:  " << cost_stay_lane << endl;
-
-  // Change lane, left?
-	STATE = 1;
-	traj_xy_t traj_xy_left;
-  traj_xy_left.x.push_back(car_x);
-	traj_xy_left.y.push_back(car_y);
-  double cost_change_left = numeric_limits<double>::max();
-
-	if (can_go_left(car_d)) {
-    traj_params = propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) - 1);
-		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
-									traj_params.d_end, traj_params.target_vs, traj_xy_left, wp_sp, nums_step);
-
-		cost_change_left = predict(sensor_fusion, t_inc, T, traj_xy_left, traj_params, car_telemetry);
-		cout << "cost: Change LEFT: " << cost_change_left << endl;
-	}
-
-	STATE = 2;
-	traj_xy_t traj_xy_right;
-  traj_xy_right.x.push_back(car_x);
-	traj_xy_right.y.push_back(car_y);
-	double cost_change_right = numeric_limits<double>::max();
-
-	if (can_go_right(car_d)) {
-		traj_params = propose_change_lane(car_vs, car_telemetry, sensor_fusion, which_lane(car_d) + 1);
-
-		generate_traj(car_s, car_d, car_vs, traj_params.car_vd,
-									traj_params.d_end, traj_params.target_vs, traj_xy_right, wp_sp, nums_step);
-
-		cost_change_right = predict(sensor_fusion, t_inc, T, traj_xy_right, traj_params, car_telemetry);
-		cout << "cost: Change RIGHT: " << cost_change_right << endl;
-	}
-
-	vector<double> state_costs = {cost_stay_lane, cost_change_left, cost_change_right};
-
-	STATE = std::distance(state_costs.begin(), min_element(state_costs.begin(), state_costs.end()));
-
-	switch(STATE) {
-		case 0:
-      cout << "stay" << endl;
-			break;
-		case 1:
-			traj_xy = traj_xy_left;
-			cout << "change LEFT" << endl;
-			break;
-		case 2:
-			traj_xy = traj_xy_right;
-			cout << "change RIGHT" << endl;
-			break;
-		default:
-			break;
-	}
-
 	return traj_xy;
 }
 
+// Planner
+double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, const double ref_vel) {
+
+	// vector< vector<double> > filtered;
+	// To achieve that
+	double x, y, vx, vy, s, d, id;
+
+	double future_x, future_y;
+	double t = 0;
+
+	// Calculate multiple costs
+	double cost = 0;
+
+	double time_till_collision = numeric_limits<double>::max();
+	for (int i = 0; i < 50; i+=1) {
+		t = i * 1/50;
+		for (auto i = 0; i < sensor_fusion.size(); i+=1) {
+			id = sensor_fusion[i][CAR_ID];
+			x = sensor_fusion[i][CAR_X];
+			y = sensor_fusion[i][CAR_Y];
+			vx = sensor_fusion[i][CAR_VX];
+			vy = sensor_fusion[i][CAR_VY];
+			s = sensor_fusion[i][CAR_S];
+			d = sensor_fusion[i][CAR_D];
+			// check lane distance
+			vector<double> ego_xy = {ego_traj.x[t], ego_traj.y[t]};
+			// Check L2 distanceHopefully, there are more opportunities in the future.
+			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
+			future_y = y + vy * t;
+			future_x = x + vx * t;
+			// In same lane or not
+			if (collides_with(future_x, future_y, ego_traj.x[t], ego_traj.y[t])) {
+				time_till_collision = min(t, time_till_collision);
+			}
+		}
+	}
+
+	cost += collision_cost(time_till_collision);
+  cost += inefficiency_cost(ref_vel);
+	return cost;
+}
+
+// From trajectories to lane?
+traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, tk::spline& s, const vector<vector<double> >& sensor_fusion) {
+
+	int lane = 1;
+	double ref_vel = propose_lane_veloctiy(c, lane_to_d(lane), car_pose, sensor_fusion);
+	traj_xy_t traj_xy = generate_trajectory(c, s, car_pose, ref_vel);
+//  predict(sensor_fusion, traj_xy,)
+  return traj_xy;
+}
 int main() {
   uWS::Hub h;
 
@@ -885,9 +704,6 @@ int main() {
 					auto sensor_fusion = j[1]["sensor_fusion"];
 
 
-					/***********************************************
-					 * Path cache
-					 ***********************************************/
 					vector<double> ptsx;
 					vector<double> ptsy;
 					int prev_size = previous_path_x.size();
@@ -910,46 +726,11 @@ int main() {
 
 					tk::spline s = fit_xy(ptsx, ptsy, car_pose);
 
-					vector<double> next_x_vals;
-          vector<double> next_y_vals;
-
-					for (int i = 0; i < prev_size; i++) {
-						next_x_vals.push_back(previous_path_x[i]);
-            next_y_vals.push_back(previous_path_y[i]);
-					}
-
-          double target_x = 30.0;
-					double target_y = s(target_x);
-					double target_dist = sqrt(pow(target_x, 2) + pow(target_y, 2));
-
-					double x_add_on = 0.0;
-					// 49.5 mph
-					double ref_vel = 49.5;
-					for (int i = 1; i <= 50 - prev_size; i+=1) {
-						double N = (target_dist/(0.02*ref_vel/2.24));
-						double x_point = x_add_on + (target_x)/N;
-						double y_point = s(x_point);
-
-						x_add_on = x_point;
-
-						double x_ref = x_point;
-						double y_ref = y_point;
-
-						// back to global?
-						x_point = (x_ref * cos(car_pose.yaw) - y_ref * sin(car_pose.yaw));
-            y_point = (x_ref * sin(car_pose.yaw) + y_ref * cos(car_pose.yaw));
-
-						x_point += car_pose.x;
-            y_point += car_pose.y;
-
-						next_x_vals.push_back(x_point);
-            next_y_vals.push_back(y_point);
-					}
-
+					traj_xy_t traj_xy = plan(car_telemetry, car_pose, s, sensor_fusion);
+//					double ref_vel = 49.5;
           json msgJson;
-					// Test u solution
-					msgJson["next_x"] = next_x_vals;
-					msgJson["next_y"] = next_y_vals;
+					msgJson["next_x"] = traj_xy.x;
+					msgJson["next_y"] = traj_xy.y;
 
 					auto msg = "42[\"control\","+ msgJson.dump()+"]";
 
