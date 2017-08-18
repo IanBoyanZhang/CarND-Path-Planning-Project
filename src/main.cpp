@@ -96,6 +96,12 @@ struct traj_params_t {
 	double target_vs;
 };
 
+struct car_pose_t {
+	double x;
+	double y;
+	double yaw;
+};
+
 // for convenience
 using json = nlohmann::json;
 
@@ -281,65 +287,23 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 }
 
 // Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
-vector<tk::spline> fitXY(const double s, const vector<double> maps_s,
+void get_wp_in_map(const double s, const double d, const vector<double> maps_s,
 										 const vector<double> maps_x, const vector<double> maps_y,
-										 const vector<double> maps_dx, const vector<double> maps_dy,
-											const double max_s) {
-	int prev_wp = -1;
+												 vector<double>& ptsx, vector<double>& ptsy) {
+	vector<double> next_wp0 = getXY(s + 30, d, maps_s, maps_x, maps_y);
+	vector<double> next_wp1 = getXY(s + 60, d, maps_s, maps_x, maps_y);
+	vector<double> next_wp2 = getXY(s + 90, d, maps_s, maps_x, maps_y);
+	vector<double> next_wp3 = getXY(s + 120, d, maps_s, maps_x, maps_y);
 
-	while (s > maps_s[prev_wp + 1] && (prev_wp < (int) (maps_s.size() - 1)))
-	{
-		prev_wp++;
-	}
+	ptsx.push_back(next_wp0[0]);
+	ptsx.push_back(next_wp1[0]);
+	ptsx.push_back(next_wp2[0]);
+	ptsx.push_back(next_wp3[0]);
 
-	vector<double> wp_s;
-  vector<double> wp_x;
-	vector<double> wp_y;
-	vector<double> wp_dx;
-	vector<double> wp_dy;
-	int wp_id;
-
-	int back_track_id = -10;
-	for (int i = back_track_id; i < 15; i+=1) {
-	//for (int i = 0, len = 7; i < len; i+=1) {
-		wp_id = (prev_wp + i)%maps_x.size();
-
-		if (wp_id < 0) {
-			wp_id += maps_s.size();
-		}
-
-		wp_s.push_back(maps_s[wp_id]);
-		wp_x.push_back(maps_x[wp_id]);
-		wp_y.push_back(maps_y[wp_id]);
-		// For better numerically stability
-		// wp_dx.push_back(maps_dx[wp_id]);
-		wp_dx.push_back(maps_dx[wp_id]);
-		// wp_dy.push_back(maps_dy[wp_id]);
-		wp_dy.push_back(maps_dy[wp_id]);
-	}
-
-	// Sort for dealing with track wrap around
-	// TODO: smooth transition using relative distance
-
-	// TODO: Wrapping around inconsistancy is still an issue?
-  auto p = sort_permutation(wp_s, less<double>());
-
-	wp_s = apply_permutation(wp_s, p);
-  wp_x = apply_permutation(wp_x, p);
-  wp_y = apply_permutation(wp_y, p);
-	wp_dx = apply_permutation(wp_dx, p);
-	wp_dy = apply_permutation(wp_dy, p);
-
-	tk::spline wp_sp_x;
-	tk::spline wp_sp_y;
-	tk::spline wp_sp_dx;
-	tk::spline wp_sp_dy;
-	wp_sp_x.set_points(wp_s, wp_x);
-	wp_sp_y.set_points(wp_s, wp_y);
-  wp_sp_dx.set_points(wp_s, wp_dx);
-	wp_sp_dy.set_points(wp_s, wp_dy);
-
-	return {wp_sp_x, wp_sp_y, wp_sp_dx, wp_sp_dy};
+	ptsy.push_back(next_wp0[1]);
+	ptsy.push_back(next_wp1[1]);
+	ptsy.push_back(next_wp2[1]);
+	ptsy.push_back(next_wp3[1]);
 }
 
 int which_lane(double d) {
@@ -351,7 +315,7 @@ int which_lane(double d) {
  * @param lane
  * @return lane center d
  */
-double lane_to_d(int lane) {
+inline double lane_to_d(int lane) {
 	return double(2 + lane * LANE_WIDTH);
 }
 
@@ -366,20 +330,33 @@ bool can_go_right(double d) {
 /*****************************************************************
  * Coordinate transformation
  *****************************************************************/
-vector<double> mapXY2localXY(const double map_x, const double map_y,
+vector<double> map2local(const double map_x, const double map_y,
 														 const double car_x, const double car_y, const double yaw)
 {
 	double x = map_x - car_x;
 	double y = map_y - car_y;
 
-	return {x * cos(yaw) + y * sin(yaw),
-					-x * sin(yaw) + y * cos(yaw)};
+	return {x * cos(0 - yaw) - y * sin(0 - yaw),
+					x * sin(0 - yaw) + y * cos(0 - yaw)};
 }
 
 vector<double> localXY2mapXY(const double car_x, const double car_y,
 														 const double l_x, const double l_y, const double yaw){
 	return {l_x * cos(yaw) - l_y * sin(yaw) + car_x,
 					l_y * sin(yaw) + l_y * cos(yaw) + car_y};
+}
+
+tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
+									const car_pose_t car_pose) {
+	vector<double> local_xy;
+	for(int i = 0; i < ptsx.size(); i+=1) {
+		local_xy = map2local(ptsx[i], ptsy[i], car_pose.x, car_pose.y, car_pose.yaw);
+		ptsx[i] = local_xy[0];
+		ptsy[i] = local_xy[1];
+	}
+	tk::spline s;
+	s.set_points(ptsx, ptsy);
+	return s;
 }
 
 vector<double> getTargetXY(const double pos_s, const double d, const vector<tk::spline> wp_sp) {
@@ -900,38 +877,12 @@ int main() {
             ptsy.push_back(ref_y);
 					}
           cout << "car_s " << car_s << endl;
-//					car_s = end_path_s;
-
-//					if (prev_size < 2) {
-//						double prev_car
-//					}
 
           int lane = 1;
-					vector<double> next_wp0 = getXY(car_s + 30, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-					vector<double> next_wp1 = getXY(car_s + 60, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-					vector<double> next_wp2 = getXY(car_s + 90, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
-					vector<double> next_wp3 = getXY(car_s + 120, (2 + 4 * lane), map_waypoints_s, map_waypoints_x, map_waypoints_y);
+          get_wp_in_map(car_s, lane_to_d(1), map_waypoints_s, map_waypoints_x, map_waypoints_y, ptsx, ptsy);
 
-					ptsx.push_back(next_wp0[0]);
-					ptsx.push_back(next_wp1[0]);
-					ptsx.push_back(next_wp2[0]);
-					ptsx.push_back(next_wp3[0]);
-
-					ptsy.push_back(next_wp0[1]);
-					ptsy.push_back(next_wp1[1]);
-					ptsy.push_back(next_wp2[1]);
-					ptsy.push_back(next_wp3[1]);
-
-					for(int i = 0; i < ptsx.size(); i+=1) {
-						double shift_x = ptsx[i] - ref_x;
-						double shift_y = ptsy[i] - ref_y;
-
-						ptsx[i] = (shift_x * cos(0 - ref_yaw) - shift_y * sin(0 - ref_yaw));
-            ptsy[i] = (shift_x * sin(0 - ref_yaw) + shift_y * cos(0 - ref_yaw));
-					}
-
-					tk::spline s;
-          s.set_points(ptsx, ptsy);
+					car_pose_t car_pose = {ref_x, ref_y, ref_yaw};
+					tk::spline s =fit_xy(ptsx, ptsy, car_pose);
 
 					vector<double> next_x_vals;
           vector<double> next_y_vals;
