@@ -73,6 +73,10 @@ struct car_telemetry_t {
 	double car_d;
 	double car_yaw;
 	double car_speed;
+  vector<double> previous_path_x;
+	vector<double> previous_path_y;
+	double end_path_s;
+	double end_path_d;
 };
 
 // Trajectory in (s, d) space
@@ -330,6 +334,51 @@ bool can_go_right(double d) {
 /*****************************************************************
  * Coordinate transformation
  *****************************************************************/
+car_telemetry_t get_telemetry(json j) {
+	car_telemetry_t car_telemetry = {
+					j[1]["x"],
+					j[1]["y"],
+					j[1]["s"],
+					j[1]["d"],
+					j[1]["yaw"],
+					j[1]["speed"],
+					// Previous path data given to the Planner
+					j[1]["previous_path_x"],
+					j[1]["previous_path_y"],
+					// Previous path's end s and d values
+					j[1]["end_path_s"],
+					j[1]["end_path_d"]
+	};
+  return car_telemetry;
+}
+vector<car_pose_t> get_init_car_poses(const car_telemetry_t c) {
+
+	double car_x = c.car_x;
+	double car_y = c.car_y;
+	double car_yaw = c.car_yaw;
+
+	double ref_x = car_x, ref_y = car_y;
+	double ref_x_prev, ref_y_prev;
+	double ref_yaw = deg2rad(car_yaw);
+
+	int prev_size = c.previous_path_x.size();
+
+	if (prev_size < 2) {
+		ref_x_prev = car_x - cos(car_yaw);
+		ref_y_prev = car_y - sin(car_yaw);
+	} else {
+		ref_x = c.previous_path_x[prev_size - 1];
+		ref_y = c.previous_path_y[prev_size - 1];
+		ref_x_prev = c.previous_path_x[prev_size - 2];
+		ref_y_prev = c.previous_path_y[prev_size - 2];
+		ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+	}
+
+	car_pose_t car_pose = {ref_x, ref_y, ref_yaw};
+  car_pose_t prev_car_pose = {ref_x_prev, ref_y_prev, ref_yaw};
+	return {prev_car_pose, car_pose};
+}
+
 vector<double> map2local(const double map_x, const double map_y, const car_pose_t car_pose)
 {
 	double x = map_x - car_pose.x;
@@ -845,41 +894,20 @@ int main() {
           cout << "prev size: " << prev_size << endl;
           cout << "<<<<<<<<<<<<<< " << endl;
 
-//					if (prev_size > 0) {
-//						car_s = end_path_s;
-//					}
+					car_telemetry_t car_telemetry = get_telemetry(j);
 
-					double ref_x = car_x, ref_y = car_y;
-          double ref_yaw = deg2rad(car_yaw);
-					if (prev_size < 2) {
-						double prev_car_x = car_x - cos(car_yaw);
-						double prev_car_y = car_y - sin(car_yaw);
-						ptsx.push_back(prev_car_x);
-            ptsx.push_back(car_x);
-//						ptsx.push_back(ref_x);
-						ptsy.push_back(prev_car_y);
-						ptsy.push_back(car_y);
-//						ptsy.push_back(ref_y);
-					} else {
-						ref_x = previous_path_x[prev_size - 1];
-						ref_y = previous_path_y[prev_size - 1];
-						double ref_x_prev = previous_path_x[prev_size - 2];
-						double ref_y_prev = previous_path_y[prev_size - 2];
-						ref_yaw = atan2(ref_y - ref_y_prev, ref_x - ref_x_prev);
+					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
+					ptsx.push_back(car_poses[0].x);
+					ptsx.push_back(car_poses[1].x);
+					ptsy.push_back(car_poses[0].y);
+					ptsy.push_back(car_poses[1].y);
 
-						// Use two points that make the path tangent to the previous path's end point
-						ptsx.push_back(ref_x_prev);
-						ptsx.push_back(ref_x);
-
-						ptsy.push_back(ref_y_prev);
-            ptsy.push_back(ref_y);
-					}
-//          cout << "car_s " << car_s << endl;
+					car_pose_t car_pose = car_poses[1];
 
           int lane = 1;
-          get_wp_in_map(car_s, lane_to_d(1), map_waypoints_s, map_waypoints_x, map_waypoints_y, ptsx, ptsy);
+          get_wp_in_map(car_s, lane_to_d(lane),
+												map_waypoints_s, map_waypoints_x, map_waypoints_y, ptsx, ptsy);
 
-					car_pose_t car_pose = {ref_x, ref_y, ref_yaw};
 					tk::spline s = fit_xy(ptsx, ptsy, car_pose);
 
 					vector<double> next_x_vals;
@@ -908,11 +936,11 @@ int main() {
 						double y_ref = y_point;
 
 						// back to global?
-						x_point = (x_ref * cos(ref_yaw) - y_ref * sin(ref_yaw));
-            y_point = (x_ref * sin(ref_yaw) + y_ref * cos(ref_yaw));
+						x_point = (x_ref * cos(car_pose.yaw) - y_ref * sin(car_pose.yaw));
+            y_point = (x_ref * sin(car_pose.yaw) + y_ref * cos(car_pose.yaw));
 
-						x_point += ref_x;
-            y_point += ref_y;
+						x_point += car_pose.x;
+            y_point += car_pose.y;
 
 						next_x_vals.push_back(x_point);
             next_y_vals.push_back(y_point);
