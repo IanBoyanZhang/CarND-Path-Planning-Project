@@ -291,8 +291,7 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 
 // Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
 vector<vector<double>> get_wp_in_map(const double s, const double d, const vector<double> maps_s,
-										 const vector<double> maps_x, const vector<double> maps_y,
-												 vector<double>& ptsx, vector<double>& ptsy) {
+										 const vector<double> maps_x, const vector<double> maps_y) {
 	vector<double> next_wp0 = getXY(s + 30, d, maps_s, maps_x, maps_y);
 	vector<double> next_wp1 = getXY(s + 60, d, maps_s, maps_x, maps_y);
 	vector<double> next_wp2 = getXY(s + 90, d, maps_s, maps_x, maps_y);
@@ -396,6 +395,10 @@ tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
 		local_xy = map2local(ptsx[i], ptsy[i], car_pose);
 		ptsx[i] = local_xy[0];
 		ptsy[i] = local_xy[1];
+		// 0.68 - 0.70 mile track warping
+		if (i && ptsx[i] <= ptsx[i - 1]) {
+			ptsx[i] += 1e-2 * numeric_limits<double>::epsilon();
+		}
 	}
 	tk::spline s;
 	s.set_points(ptsx, ptsy);
@@ -403,7 +406,7 @@ tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
 }
 
 /**************************************************
- * COST FUNCTIONS for Behaviour Planners
+ * Utils functions for Behaviour Planners
  **************************************************/
 bool collides_with(double car_x, double car_y, double other_x, double other_y) {
 	return distance(car_x, car_y, other_x, other_y) < COLLISION_DISTANCE;
@@ -423,7 +426,7 @@ int closest_car_in_front(const vector<vector<double>>& sensor_fusion,
 	double other_car_d;
 	for (int i = 0; i < NUMS_OF_CARS; i+=1) {
 		other_car_d = sensor_fusion[i][CAR_D];
-    // Below may not be necessary it seems the simulator sends
+    // This may not be necessary it seems the simulator sends
 		// Only the same direction traveling vehicles
 //		if (other_car_d < 0) { continue; }
 		if (!in_same_lane(car_d, other_car_d)) { continue; }
@@ -498,7 +501,7 @@ double lane_preference_cost(double d) {
 // TODO: maybe the self lane keeping method is buggy?
 // Causing the car to jump from time to time? Acceleration
 double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
-																const vector<vector<double>>& sensor_fusion, double& ref_vel) {
+																const vector<vector<double>>& sensor_fusion, double ref_vel) {
 	double ego_s = c.car_s;
 //	double ego_d = c.car_d;
 	double ego_d = d;
@@ -623,7 +626,7 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 
 	int lane = 1;
 	double d = lane_to_d(lane);
-	vector<vector<double> > next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y, ptsx, ptsy);
+	vector<vector<double> > next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
 
 	for (auto i = 0; i < next_wps.size(); i+=1) {
 		ptsx.push_back(next_wps[i][0]);
@@ -632,10 +635,10 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 
 	tk::spline s = fit_xy(ptsx, ptsy, car_pose);
 
-	ref_vel = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-	traj_xy_t traj_xy = generate_trajectory(c, s, car_pose, ref_vel);
-  double cost_lane_1 = predict(sensor_fusion, traj_xy, ref_vel);
-	cout << "cost lane 1" << cost_lane_1 << endl;
+	double ref_vel_1 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
+	traj_xy_t traj_xy_1 = generate_trajectory(c, s, car_pose, ref_vel_1);
+  double cost_lane_1 = predict(sensor_fusion, traj_xy_1, ref_vel);
+	cout << "cost lane 1:" << cost_lane_1 << endl;
 
 	// recover local coordinate vector
 	for (auto i = 0; i < next_wps.size(); i+=1) {
@@ -643,22 +646,51 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 		ptsy.pop_back();
 	}
 
-//	lane = 2;
-//	d = lane_to_d(lane);
-//	// Shall we use dx dy?
-//	for (auto i = 0; i < next_wps.size(); i+=1) {
-//		ptsx.push_back(next_wps[i][0]);
-//		ptsy.push_back(next_wps[i][1]);
-//	}
-//  next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y, ptsx, ptsy);
-//	s = fit_xy(ptsx, ptsy, car_pose);
-//
-//	ref_vel = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-//	traj_xy_t traj_xy = generate_trajectory(c, s, car_pose, ref_vel);
-//  double cost_lane_1 = predict(sensor_fusion, traj_xy, ref_vel);
-//	cout << "cost lane 1" << cost_lane_1 << endl;
+	lane = 2;
+	d = lane_to_d(lane);
+	// Shall we use dx dy?
+	next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
+	for (auto i = 0; i < next_wps.size(); i+=1) {
+		ptsx.push_back(next_wps[i][0]);
+		ptsy.push_back(next_wps[i][1]);
+	}
+	s = fit_xy(ptsx, ptsy, car_pose);
 
-  return traj_xy;
+	double ref_vel_2 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
+	traj_xy_t traj_xy_2 = generate_trajectory(c, s, car_pose, ref_vel);
+  double cost_lane_2 = predict(sensor_fusion, traj_xy_2, ref_vel);
+	cout << "cost lane 2:" << cost_lane_2 << endl;
+
+	// recover local coordinate vector
+	for (auto i = 0; i < next_wps.size(); i+=1) {
+		ptsx.pop_back();
+		ptsy.pop_back();
+	}
+//
+	lane = 0;
+	d = lane_to_d(lane);
+	// Shall we use dx dy?
+	next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
+	for (auto i = 0; i < next_wps.size(); i+=1) {
+		ptsx.push_back(next_wps[i][0]);
+		ptsy.push_back(next_wps[i][1]);
+	}
+	s = fit_xy(ptsx, ptsy, car_pose);
+
+	double ref_vel_0 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
+	traj_xy_t traj_xy_0 = generate_trajectory(c, s, car_pose, ref_vel);
+	double cost_lane_0 = predict(sensor_fusion, traj_xy_0, ref_vel);
+	cout << "cost lane 0: " << cost_lane_0 << endl;
+
+//	 recover local coordinate vector
+	for (auto i = 0; i < next_wps.size(); i+=1) {
+		ptsx.pop_back();
+		ptsy.pop_back();
+	}
+
+  // Decision
+  ref_vel = ref_vel_1;
+  return traj_xy_1;
 }
 int main() {
   uWS::Hub h;
