@@ -85,6 +85,7 @@ struct traj_xy_t {
 	vector<double> x;
 	vector<double> y;
   double velocity;
+	double cost = numeric_limits<double>::max();
 };
 
 struct car_pose_t {
@@ -393,7 +394,7 @@ tk::spline fit_xy(vector<double>& ptsx, vector<double>& ptsy,
 		ptsy[i] = local_xy[1];
 		// 0.68 - 0.70 mile track warping
 		if (i && ptsx[i] <= ptsx[i - 1]) {
-			ptsx[i] += 1e-2 * numeric_limits<double>::epsilon();
+			ptsx[i] += 1e6 * numeric_limits<double>::epsilon();
 		}
 	}
 	tk::spline s;
@@ -479,24 +480,12 @@ double inefficiency_cost(const double ref_vel) {
 	return multiplier * EFFICIENCY;
 }
 
-double lane_preference_cost(double d) {
-	int lane = which_lane(d);
-	return MOVE_TO_LEFT_LANE * (lane - 0);
-}
+//double lane_preference_cost(double d) {
+//	int lane = which_lane(d);
+//	return MOVE_TO_LEFT_LANE * (lane - 0);
+//}
 
-// FSM
-// lane or d?
-// sensor_fusion or sensor_fusion_snapshot
-/**
- * car_vs should really be from car_telemetry
- * @param car_telemetry
- * @param sensor_fusion
- * @param car_vs
- * @return
- */
-// TODO: maybe the self lane keeping method is buggy?
-// Causing the car to jump from time to time? Acceleration
-double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
+double propose_lane_velocity(car_telemetry_t c, double d, car_pose_t car_pose,
 																const vector<vector<double>>& sensor_fusion, double ref_vel) {
 	double ego_s = c.car_s;
 //	double ego_d = c.car_d;
@@ -575,7 +564,6 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 	return traj_xy;
 }
 
-// Planner
 double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, const double ref_vel) {
 
 	double x, y, vx, vy, s, d, id;
@@ -615,79 +603,63 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 	return cost;
 }
 
-traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double& ref_vel,
-							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
-
-  double car_s = c.car_s;
-
-	int lane = 1;
-	double d = lane_to_d(lane);
+traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const double d,
+														 const vector<vector<double> >& sensor_fusion, double ref_vel, const map_waypoints_t& map_wps,
+														 vector<double> ptsx, vector<double>ptsy) {
+	double car_s = c.car_s;
 	vector<vector<double> > next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
-
 	for (auto i = 0; i < next_wps.size(); i+=1) {
 		ptsx.push_back(next_wps[i][0]);
 		ptsy.push_back(next_wps[i][1]);
 	}
-
 	tk::spline s = fit_xy(ptsx, ptsy, car_pose);
+  double _ref_vel = propose_lane_velocity(c, d, car_pose, sensor_fusion, ref_vel);
+	traj_xy_t traj_xy = generate_trajectory(c, s, car_pose, _ref_vel);
+  double cost = predict(sensor_fusion, traj_xy, _ref_vel);
+	traj_xy.velocity = _ref_vel;
+  traj_xy.cost = cost;
+	return traj_xy;
+}
 
-	double ref_vel_1 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-	traj_xy_t traj_xy_1 = generate_trajectory(c, s, car_pose, ref_vel_1);
-  double cost_lane_1 = predict(sensor_fusion, traj_xy_1, ref_vel);
-	cout << "cost lane 1:" << cost_lane_1 << endl;
+traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double ref_vel,
+							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
 
-	// recover local coordinate vector
-	for (auto i = 0; i < next_wps.size(); i+=1) {
-		ptsx.pop_back();
-		ptsy.pop_back();
-	}
+	int lane = 1;
+  double d = lane_to_d(lane);
+  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+
+
+	cout << "cost 1: " << traj_xy_1.cost << endl;
 
 	lane = 2;
 	d = lane_to_d(lane);
-	// Shall we use dx dy?
-	next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
-	for (auto i = 0; i < next_wps.size(); i+=1) {
-		ptsx.push_back(next_wps[i][0]);
-		ptsy.push_back(next_wps[i][1]);
-	}
-	s = fit_xy(ptsx, ptsy, car_pose);
+	traj_xy_t traj_xy_2 = propose_trajectory(c, car_pose, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
-	double ref_vel_2 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-	traj_xy_t traj_xy_2 = generate_trajectory(c, s, car_pose, ref_vel_2);
-  double cost_lane_2 = predict(sensor_fusion, traj_xy_2, ref_vel_2);
-	cout << "cost lane 2:" << cost_lane_2 << endl;
+	cout << "cost 2: " << traj_xy_2.cost << endl;
 
-	// recover local coordinate vector
-	for (auto i = 0; i < next_wps.size(); i+=1) {
-		ptsx.pop_back();
-		ptsy.pop_back();
-	}
-//
 	lane = 0;
 	d = lane_to_d(lane);
-	// Shall we use dx dy?
-	next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
-	for (auto i = 0; i < next_wps.size(); i+=1) {
-		ptsx.push_back(next_wps[i][0]);
-		ptsy.push_back(next_wps[i][1]);
-	}
-	s = fit_xy(ptsx, ptsy, car_pose);
+	traj_xy_t traj_xy_0 = propose_trajectory(c, car_pose, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
-	double ref_vel_0 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-	traj_xy_t traj_xy_0 = generate_trajectory(c, s, car_pose, ref_vel_0);
-	double cost_lane_0 = predict(sensor_fusion, traj_xy_0, ref_vel_0);
-	cout << "cost lane 0: " << cost_lane_0 << endl;
+	cout << "cost 0: " << traj_xy_0.cost << endl;
 
-//	 recover local coordinate vector
-	for (auto i = 0; i < next_wps.size(); i+=1) {
-		ptsx.pop_back();
-		ptsy.pop_back();
+  traj_xy_t traj_xy = traj_xy_1;
+	lane = 1;
+	if (traj_xy.cost > traj_xy_2.cost) {
+		traj_xy = traj_xy_2;
+    lane = 2;
 	}
 
-  // Decision
-  ref_vel = ref_vel_1;
-  return traj_xy_1;
+	if (traj_xy.cost > traj_xy_0.cost) {
+		traj_xy = traj_xy_0;
+		lane = 0;
+	}
+
+	// Decision
+	cout << "lane ----> " << lane << endl;
+  return traj_xy;
 }
+
 int main() {
   uWS::Hub h;
 
@@ -787,9 +759,10 @@ int main() {
 					ptsy.push_back(car_poses[1].y);
 
 					car_pose_t car_pose = car_poses[1];
+
           if (prev_size >= 2) {
-						car_s = end_path_s;
-						car_telemetry.car_s = car_s;
+//						car_s = end_path_s;
+//						car_telemetry.car_s = car_s;
 						car_telemetry.car_speed = estimate_true_car_speed(car_poses);
 					}
 
@@ -797,6 +770,8 @@ int main() {
 					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
 					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
+					// Cache velocity for next simulator loop
+					ref_vel = traj_xy.velocity;
 					cout << "<<<<<<<<<<<<<< " << endl;
 
           json msgJson;
