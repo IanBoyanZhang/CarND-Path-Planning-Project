@@ -537,16 +537,16 @@ double propose_lane_velocity(car_telemetry_t c, double d, car_pose_t car_pose,
 
 traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_t car_pose, double ref_vel) {
 	traj_xy_t traj_xy;
-	vector<double> l_ptsx;
-	vector<double> l_ptsy;
+//	vector<double> l_ptsx;
+//	vector<double> l_ptsy;
 //
 //  car_pose_t car_pose_prev_start = {c.car_x, c.car_y, deg2rad(c.car_yaw)};
 //
-  for (auto i = 40; i < c.previous_path_x.size(); i+=1) {
-		vector<double> l_xy = map2local(c.previous_path_x[i], c.previous_path_y[i], car_pose);
-    l_ptsx.push_back(l_xy[0]);
-		l_ptsy.push_back(l_xy[1]);
-	}
+//  for (auto i = 40; i < c.previous_path_x.size(); i+=1) {
+//		vector<double> l_xy = map2local(c.previous_path_x[i], c.previous_path_y[i], car_pose);
+//    l_ptsx.push_back(l_xy[0]);
+//		l_ptsy.push_back(l_xy[1]);
+//	}
 
 	for (int i = 0; i < c.previous_path_x.size(); i+=1) {
 		traj_xy.x.push_back(c.previous_path_x[i]);
@@ -580,36 +580,37 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 
 //		cout << "x_point" << x_point << endl;
 //    cout << "y_point" << y_point << endl;
-//		traj_xy.x.push_back(x_point);
-//		traj_xy.y.push_back(y_point);
+		traj_xy.x.push_back(x_point);
+		traj_xy.y.push_back(y_point);
 
-		l_ptsx.push_back(x_ref);
-    l_ptsy.push_back(y_ref);
+//		l_ptsx.push_back(x_ref);
+//    l_ptsy.push_back(y_ref);
 	}
 
 
 	// smooth again
-	tk::spline	s_prev;
-  s_prev.set_points(l_ptsx, l_ptsy);
-	x_add_on = 0;
-	target_x = 50;
-	target_y = s_prev(target_x);
-  for (auto i = 0; i <  50 - c.previous_path_x.size(); i+=1) {
-		double N = target_dist/(0.02 * ref_vel * 0.44704);
-		double x_point = x_add_on + (target_x)/N;
-		double y_point = s_prev(x_point);
-
-		x_add_on = x_point;
-
-		double x_ref = x_point;
-		double y_ref = y_point;
-
-		x_point = (x_ref * cos(car_pose.yaw) - y_ref * sin(car_pose.yaw)) + car_pose.x;
-		y_point = (x_ref * sin(car_pose.yaw) + y_ref * cos(car_pose.yaw)) + car_pose.y;
-
-    traj_xy.x.push_back(x_point);
-    traj_xy.y.push_back(y_point);
-	}
+//	tk::spline	s_prev;
+//  s_prev.set_points(l_ptsx, l_ptsy);
+//	x_add_on = 0;
+//	target_x = 50;
+//	target_y = s_prev(target_x);
+//  for (auto i = 0; i <  50 - c.previous_path_x.size(); i+=1) {
+//	for (auto i = 0; i <  50; i+=1) {
+//		double N = target_dist/(0.02 * ref_vel * 0.44704);
+//		double x_point = x_add_on + (target_x)/N;
+//		double y_point = s_prev(x_point);
+//
+//		x_add_on = x_point;
+//
+//		double x_ref = x_point;
+//		double y_ref = y_point;
+//
+//		x_point = (x_ref * cos(car_pose.yaw) - y_ref * sin(car_pose.yaw)) + car_pose.x;
+//		y_point = (x_ref * sin(car_pose.yaw) + y_ref * cos(car_pose.yaw)) + car_pose.y;
+//
+//    traj_xy.x.push_back(x_point);
+//    traj_xy.y.push_back(y_point);
+//	}
 	return traj_xy;
 }
 
@@ -618,7 +619,6 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 	double x, y, vx, vy, s, d, id;
 
 	double future_x, future_y;
-	double t = 0;
 
 	// Calculate multiple costs
 	double cost = 0;
@@ -626,7 +626,6 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 	double time_till_collision = numeric_limits<double>::max();
 	double min_distance = numeric_limits<double>::max();
 	for (int i = 0; i < 50; i+=1) {
-		t = i * 0.02;
 		for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
 			x = sensor_fusion[i][CAR_X];
@@ -639,11 +638,9 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 			vector<double> ego_xy = {ego_traj.x[i], ego_traj.y[i]};
 			// Check L2 distanceHopefully, there are more opportunities in the future.
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
-			future_y = y + vy * t;
-			future_x = x + vx * t;
+			future_y = y + vy * i * 0.02;
+			future_x = x + vx * i * 0.02;
 
-			cout << "futurex: " << future_x << endl;
-      cout << "futurey: " << future_y << endl;
       // Collision detection/prediction under x-y
 			if (collides_with(future_x, future_y, ego_traj.x[i], ego_traj.y[i])) {
 				time_till_collision = min(t, time_till_collision);
