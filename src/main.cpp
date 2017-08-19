@@ -80,12 +80,6 @@ struct car_telemetry_t {
 	double end_path_d;
 };
 
-// Trajectory in (s, d) space
-//struct traj_sd_t {
-//	vector<double> s;
-//	vector<double> d;
-//};
-
 // Trajectory in (x, y) space
 struct traj_xy_t {
 	vector<double> x;
@@ -101,6 +95,14 @@ struct car_pose_t {
 	double x;
 	double y;
 	double yaw;
+};
+
+struct map_waypoints_t {
+	vector<double> x;
+	vector<double> y;
+	vector<double> s;
+	vector<double> dx;
+	vector<double> dy;
 };
 
 // for convenience
@@ -311,20 +313,15 @@ int which_lane(double d) {
 	return int(d / LANE_WIDTH);
 }
 
-/**
- *
- * @param lane
- * @return lane center d
- */
 inline double lane_to_d(int lane) {
 	return double(2 + lane * LANE_WIDTH);
 }
 
-bool can_go_left(double d) {
+bool has_left_lane(double d) {
 	return (which_lane(d) - 1) >= MIN_LANE_ID;
 }
 
-bool can_go_right(double d) {
+bool has_right_lane(double d) {
 	return (which_lane(d) + 1) <= MAX_LANE_ID;
 }
 
@@ -485,15 +482,6 @@ double inefficiency_cost(const double ref_vel) {
 	return multiplier * EFFICIENCY;
 }
 
-//double inefficiency_cost(traj_xy_t traj_xy) {
-//  double average_speed = accumulate(traj_xy._VS.begin(), traj_xy._VS.end(), 0.0)/traj_xy._VS.size();
-//  double speed_diff = MAX_DIST_DIFF - average_speed;
-//
-//	double pct = speed_diff / MAX_DIST_DIFF;
-//  double multiplier = pow(pct, 2);
-//	return multiplier * EFFICIENCY;
-//}
-
 double lane_preference_cost(double d) {
 	int lane = which_lane(d);
 	return MOVE_TO_LEFT_LANE * (lane - 0);
@@ -532,7 +520,6 @@ double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
 	// Define trajectory parameters
 	// Too close slow down!
 	if (closest_front < BUFFER_DISTANCE && closest_front >= CLOSE_DISTANCE) {
-//		ref_vel -= .07;
 		ref_vel += PID_P * (target_velocity - ref_vel);
 	}
 
@@ -541,7 +528,6 @@ double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
 	}
 
 	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 49.5 && ref_vel >= 20){
-//		ref_vel += .25;
     ref_vel += PID_P * (49.5 - ref_vel);
 	}
 
@@ -570,9 +556,7 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 
 	double x_add_on = 0.0;
 
-	double car_speed = c.car_speed;
 	for (int i = 0; i < 50 - c.previous_path_x.size(); i+=1) {
-		// Bang Bang controller
 		double N = (target_dist/(0.02*ref_vel*0.44704));
 		double x_point = x_add_on + (target_x)/N;
 		double y_point = s(x_point);
@@ -597,8 +581,6 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 // Planner
 double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, const double ref_vel) {
 
-	// vector< vector<double> > filtered;
-	// To achieve that
 	double x, y, vx, vy, s, d, id;
 
 	double future_x, future_y;
@@ -609,7 +591,7 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 
 	double time_till_collision = numeric_limits<double>::max();
 	for (int i = 0; i < 50; i+=1) {
-		t = i * 1/50;
+		t = i * 0.02;
 		for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
 			x = sensor_fusion[i][CAR_X];
@@ -636,12 +618,21 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 	return cost;
 }
 
-// From trajectories to lane?
-traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, double d, tk::spline& s, const vector<vector<double> >& sensor_fusion, double& ref_vel) {
+traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double& ref_vel,
+							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
+
+  double car_s = c.car_s;
+
+	int lane = 1;
+	double d = lane_to_d(lane);
+	get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y, ptsx, ptsy);
+
+	tk::spline s = fit_xy(ptsx, ptsy, car_pose);
 
 	ref_vel = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
 	traj_xy_t traj_xy = generate_trajectory(c, s, car_pose, ref_vel);
-//  predict(sensor_fusion, traj_xy,)
+  double cost_lane_1 = predict(sensor_fusion, traj_xy, ref_vel);
+	cout << "cost lane 1" << cost_lane_1 << endl;
   return traj_xy;
 }
 int main() {
@@ -687,7 +678,13 @@ int main() {
 
 	double ref_vel = 0.0;
 
-  h.onMessage([&ref_vel, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+	map_waypoints_t map_wps = { map_waypoints_x,
+															map_waypoints_y,
+															map_waypoints_s,
+															map_waypoints_dx,
+															map_waypoints_dy };
+
+  h.onMessage([&ref_vel, &map_wps, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -727,8 +724,6 @@ int main() {
 					vector<double> ptsx;
 					vector<double> ptsy;
 					int prev_size = previous_path_x.size();
-          cout << "prev size: " << prev_size << endl;
-          cout << "<<<<<<<<<<<<<< " << endl;
 
 					car_telemetry_t car_telemetry = get_telemetry(j);
 
@@ -741,21 +736,16 @@ int main() {
 					car_pose_t car_pose = car_poses[1];
           if (prev_size >= 2) {
 						car_s = end_path_s;
+						car_telemetry.car_s = car_s;
 						car_telemetry.car_speed = estimate_true_car_speed(car_poses);
 					}
 
-					cout << "car_speed" << car_telemetry.car_speed <<endl;
-          int lane = 1;
-//					if (car_speed < 40) {
-//						lane = 2;
-//					}
-          get_wp_in_map(car_s, lane_to_d(lane),
-												map_waypoints_s, map_waypoints_x, map_waypoints_y, ptsx, ptsy);
+          //
+					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
+					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
-					tk::spline s = fit_xy(ptsx, ptsy, car_pose);
+					cout << "<<<<<<<<<<<<<< " << endl;
 
-					traj_xy_t traj_xy = plan(car_telemetry, car_pose, lane_to_d(lane), s, sensor_fusion, ref_vel);
-//					double ref_vel = 49.5;
           json msgJson;
 					msgJson["next_x"] = traj_xy.x;
 					msgJson["next_y"] = traj_xy.y;
