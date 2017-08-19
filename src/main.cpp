@@ -84,11 +84,7 @@ struct car_telemetry_t {
 struct traj_xy_t {
 	vector<double> x;
 	vector<double> y;
-};
-
-struct traj_params_t {
-	double d_end;
-	double ref_vel;
+  double velocity;
 };
 
 struct car_pose_t {
@@ -607,7 +603,7 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
 			future_y = y + vy * t;
 			future_x = x + vx * t;
-			// In same lane or not
+      // Collision detection/prediction under x-y
 			if (collides_with(future_x, future_y, ego_traj.x[t], ego_traj.y[t])) {
 				time_till_collision = min(t, time_till_collision);
 			}
@@ -657,8 +653,8 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 	s = fit_xy(ptsx, ptsy, car_pose);
 
 	double ref_vel_2 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-	traj_xy_t traj_xy_2 = generate_trajectory(c, s, car_pose, ref_vel);
-  double cost_lane_2 = predict(sensor_fusion, traj_xy_2, ref_vel);
+	traj_xy_t traj_xy_2 = generate_trajectory(c, s, car_pose, ref_vel_2);
+  double cost_lane_2 = predict(sensor_fusion, traj_xy_2, ref_vel_2);
 	cout << "cost lane 2:" << cost_lane_2 << endl;
 
 	// recover local coordinate vector
@@ -678,8 +674,8 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 	s = fit_xy(ptsx, ptsy, car_pose);
 
 	double ref_vel_0 = propose_lane_veloctiy(c, d, car_pose, sensor_fusion, ref_vel);
-	traj_xy_t traj_xy_0 = generate_trajectory(c, s, car_pose, ref_vel);
-	double cost_lane_0 = predict(sensor_fusion, traj_xy_0, ref_vel);
+	traj_xy_t traj_xy_0 = generate_trajectory(c, s, car_pose, ref_vel_0);
+	double cost_lane_0 = predict(sensor_fusion, traj_xy_0, ref_vel_0);
 	cout << "cost lane 0: " << cost_lane_0 << endl;
 
 //	 recover local coordinate vector
