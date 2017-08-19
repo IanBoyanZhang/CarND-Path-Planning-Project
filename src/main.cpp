@@ -35,8 +35,8 @@ using namespace std;
 
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 15;
-const double BUFFER_DISTANCE = 25;
+const double CLOSE_DISTANCE = 20;
+const double BUFFER_DISTANCE = 35;
 const double DETECTION_DISTANCE = 50;
 const double COLLISION_DISTANCE = 4.2;
 
@@ -520,7 +520,7 @@ double propose_lane_velocity(car_telemetry_t c, double d, car_pose_t car_pose,
   // low speed/cold start
 	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 20) {
 		// .3 gives you about 9m/s^2 s acceleration
-		ref_vel += .28;
+		ref_vel += .224;
 	}
 
 	cout << "closest_front: " << closest_front << endl;
@@ -531,6 +531,7 @@ double propose_lane_velocity(car_telemetry_t c, double d, car_pose_t car_pose,
 
 traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_t car_pose, double ref_vel) {
 	traj_xy_t traj_xy;
+	vector<vector<double>> path_local_xy;
 	for (int i = 0; i < c.previous_path_x.size(); i+=1) {
 		traj_xy.x.push_back(c.previous_path_x[i]);
 		traj_xy.y.push_back(c.previous_path_y[i]);
@@ -543,6 +544,7 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 	double x_add_on = 0.0;
 
 	for (int i = 0; i < 50 - c.previous_path_x.size(); i+=1) {
+//    path_local_xy.push_back(c.previous_path_x[i], c.previous_path_y, ca);
 		double N = (target_dist/(0.02*ref_vel*0.44704));
 		double x_point = x_add_on + (target_x)/N;
 		double y_point = s(x_point);
@@ -575,7 +577,7 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 	double cost = 0;
 
 	double time_till_collision = numeric_limits<double>::max();
-	for (int i = 0; i < 50; i+=1) {
+	for (int i = 0; i < 70; i+=1) {
 		t = i * 0.02;
 		for (auto i = 0; i < sensor_fusion.size(); i+=1) {
 			id = sensor_fusion[i][CAR_ID];
