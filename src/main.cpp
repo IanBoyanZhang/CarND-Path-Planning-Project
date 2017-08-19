@@ -35,8 +35,8 @@ using namespace std;
 
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 15;
-const double BUFFER_DISTANCE = 30;
+const double CLOSE_DISTANCE = 20;
+const double BUFFER_DISTANCE = 35;
 const double DETECTION_DISTANCE = 50;
 const double COLLISION_DISTANCE = 4.2;
 
@@ -532,11 +532,11 @@ double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
 	// Define trajectory parameters
 	// Too close slow down!
 	if (closest_front < BUFFER_DISTANCE && closest_front >= CLOSE_DISTANCE) {
-		ref_vel -= .080;
+		ref_vel -= .1;
 	}
 
 	if (closest_front < CLOSE_DISTANCE) {
-    ref_vel -= .3;
+    ref_vel -= .12;
 	}
 
 	if (closest_front >= BUFFER_DISTANCE && ref_vel < 49.5){
