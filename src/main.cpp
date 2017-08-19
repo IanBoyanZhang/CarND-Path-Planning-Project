@@ -35,14 +35,14 @@ using namespace std;
 
 const int NUMS_OF_CARS = 12;
 const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 20;
-const double BUFFER_DISTANCE = 35;
+const double CLOSE_DISTANCE = 15;
+const double BUFFER_DISTANCE = 25;
 const double DETECTION_DISTANCE = 50;
 const double COLLISION_DISTANCE = 4.2;
 
 const double MAX_DIST_DIFF = 0.427;
 
-const double PID_P = 0.01;
+const double PID_P = 0.05;
 
 // Four types of incidents
 // COLLISION
@@ -532,15 +532,23 @@ double propose_lane_veloctiy(car_telemetry_t c, double d, car_pose_t car_pose,
 	// Define trajectory parameters
 	// Too close slow down!
 	if (closest_front < BUFFER_DISTANCE && closest_front >= CLOSE_DISTANCE) {
-		ref_vel -= .1;
+//		ref_vel -= .07;
+		ref_vel += PID_P * (target_velocity - ref_vel);
 	}
 
 	if (closest_front < CLOSE_DISTANCE) {
-    ref_vel -= .12;
+    ref_vel -= .10;
 	}
 
-	if (closest_front >= BUFFER_DISTANCE && ref_vel < 49.5){
-		ref_vel += .3;
+	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 49.5 && ref_vel >= 20){
+//		ref_vel += .25;
+    ref_vel += PID_P * (49.5 - ref_vel);
+	}
+
+  // low speed/cold start
+	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 20) {
+		// .3 gives you about 9m/s^2 s acceleration
+		ref_vel += .28;
 	}
 
 	cout << "closest_front: " << closest_front << endl;
