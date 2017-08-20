@@ -611,13 +611,10 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
     prev_x = x_point;
 		prev_y = y_point;
 
-//		cout << "x_point" << x_point << endl;
-//    cout << "y_point" << y_point << endl;
 		traj_xy.x.push_back(x_point);
 		traj_xy.y.push_back(y_point);
 	}
 
-//  for (int i = 0; i < )
 	return traj_xy;
 }
 
@@ -675,7 +672,6 @@ traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const
 		ptsy.push_back(next_wps[i][1]);
 	}
 	tk::spline s = fit_xy(ptsx, ptsy, car_pose);
-//  double _ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel);
 
 	// from new planner
 	double _ref_vel = ref_vel;
@@ -963,27 +959,6 @@ int main() {
 					// Sensor Fusion Data, a list of all other cars on the same side of the road.
 					auto sensor_fusion = j[1]["sensor_fusion"];
 
-
-//					vector<double> ptsx;
-//					vector<double> ptsy;
-//					int prev_size = previous_path_x.size();
-//
-//					car_telemetry_t car_telemetry = get_telemetry(j);
-//
-//					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
-//
-//					ptsx.push_back(car_poses[0].x);
-//					ptsx.push_back(car_poses[1].x);
-//					ptsy.push_back(car_poses[0].y);
-//					ptsy.push_back(car_poses[1].y);
-//
-//					car_pose_t car_pose = car_poses[1];
-//          if (prev_size >= 2) {
-//						car_s = end_path_s;
-//						car_telemetry.car_s = car_s;
-//						car_telemetry.car_speed = estimate_true_car_speed(car_poses);
-//					}
-
 					double ref_vel = 49.5; //mph
 
 					int prev_size = previous_path_x.size();
@@ -1035,7 +1010,6 @@ int main() {
 						ptsy.push_back(previous_path_y[prev_size-2]);
 						ptsy.push_back(previous_path_y[prev_size-1]);
 
-
 					}
 
           //
@@ -1043,95 +1017,12 @@ int main() {
 //					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
 					// Cache velocity for next simulator loop
-//					ref_vel = traj_xy.velocity;
-
 					ref_vel = new_plan(car_telemetry, car_pose, sensor_fusion, map_wps, lane, lane_change_wp);
-					vector<double> next_wp0 = getXY(car_s+30,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
-					vector<double> next_wp1 = getXY(car_s+60,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
-					vector<double> next_wp2 = getXY(car_s+90,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
 
-					ptsx.push_back(next_wp0[0]);
-					ptsx.push_back(next_wp1[0]);
-					ptsx.push_back(next_wp2[0]);
+					double d_ = 2 + 4*lane;
+          traj_xy_t traj_xy = propose_trajectory(car_telemetry, car_pose, d_, d_,
+																								 sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
-					ptsy.push_back(next_wp0[1]);
-					ptsy.push_back(next_wp1[1]);
-					ptsy.push_back(next_wp2[1]);
-
-//					double d_ = 2 + 4*lane;
-//          traj_xy_t traj_xy = propose_trajectory(car_telemetry, car_pose, d_, d_,
-//																								 sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-//					generate_trajectory(car_telemetry, );
-
-
-
-					ref_yaw = car_pose.yaw;
-          ref_x = car_pose.x;
-					ref_y = car_pose.y;
-					for (int i = 0; i < ptsx.size(); i++ )
-					{
-
-						//shift car reference angle to 0 degrees
-						double shift_x = ptsx[i]-ref_x;
-						double shift_y = ptsy[i]-ref_y;
-
-						ptsx[i] = (shift_x *cos(0-ref_yaw)-shift_y*sin(0-ref_yaw));
-						ptsy[i] = (shift_x *sin(0-ref_yaw)+shift_y*cos(0-ref_yaw));
-
-					}
-					tk::spline s;
-
-
-					s.set_points(ptsx,ptsy);
-
-
-          traj_xy_t traj_xy;
-
-					for(int i = 0; i < previous_path_x.size(); i++)
-					{
-						traj_xy.x.push_back(previous_path_x[i]);
-						traj_xy.y.push_back(previous_path_y[i]);
-					}
-
-					car_speed = car_telemetry.car_speed;
-
-					double target_x = 30.0;
-					double target_y = s(target_x);
-					double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
-
-					double x_add_on = 0;
-
-					for (int i = 1; i <= 50-previous_path_x.size(); i++) {
-
-						if(ref_vel > car_speed)
-						{
-							car_speed+=.224;
-						}
-						else if(ref_vel < car_speed)
-						{
-							car_speed-=.224;
-						}
-
-
-						double N = (target_dist/(.02*car_speed/2.24));
-						double x_point = x_add_on+(target_x)/N;
-						double y_point = s(x_point);
-
-						x_add_on = x_point;
-
-						double x_ref = x_point;
-						double y_ref = y_point;
-
-						x_point = (x_ref *cos(ref_yaw)-y_ref*sin(ref_yaw));
-						y_point = (x_ref *sin(ref_yaw)+y_ref*cos(ref_yaw));
-
-						x_point += ref_x;
-						y_point += ref_y;
-
-
-						traj_xy.x.push_back(x_point);
-						traj_xy.y.push_back(y_point);
-					}
 					cout << "<<<<<<<<<<<<<< " << endl;
 
           json msgJson;
