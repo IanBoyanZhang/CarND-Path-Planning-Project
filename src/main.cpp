@@ -392,7 +392,7 @@ vector<car_pose_t> get_init_car_poses(const car_telemetry_t& c) {
 }
 
 double estimate_true_car_speed(const vector<car_pose_t>& car_poses) {
-	return distance(car_poses[1].x, car_poses[1].y, car_poses[0].x, car_poses[1].y) / 0.02 * 2.237;
+	return distance(car_poses[1].x, car_poses[1].y, car_poses[0].x, car_poses[0].y) / 0.02 * 2.237;
 };
 
 vector<double> map2local(const double map_x, const double map_y, const car_pose_t car_pose)
@@ -993,29 +993,19 @@ int main() {
 					double ref_y = car_y;
 					double ref_yaw = deg2rad(car_yaw);
 					car_telemetry_t car_telemetry = get_telemetry(j);
+					get_init_car_poses(car_telemetry);
+					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
+					car_pose_t car_pose = car_poses[1];
+
 					if(prev_size < 2)
 					{
 						next_wp = NextWaypoint(ref_x, ref_y, ref_yaw, map_waypoints_x,map_waypoints_y,map_waypoints_dx,map_waypoints_dy);
 					}
 					else
 					{
-						ref_x = previous_path_x[prev_size-1];
-						double ref_x_prev = previous_path_x[prev_size-2];
-						ref_y = previous_path_y[prev_size-1];
-						double ref_y_prev = previous_path_y[prev_size-2];
-						ref_yaw = atan2(ref_y-ref_y_prev,ref_x-ref_x_prev);
-						next_wp = NextWaypoint(ref_x,ref_y,ref_yaw,map_waypoints_x,map_waypoints_y,map_waypoints_dx,map_waypoints_dy);
-
-						car_s = end_path_s;
-						car_speed = (sqrt((ref_x-ref_x_prev)*(ref_x-ref_x_prev)+(ref_y-ref_y_prev)*(ref_y-ref_y_prev))/.02)*2.237;
+						next_wp = NextWaypoint(car_pose.x,car_pose.y,car_pose.yaw,map_waypoints_x,map_waypoints_y,map_waypoints_dx,map_waypoints_dy);
+            car_speed = estimate_true_car_speed(car_poses);
 					}
-
-          get_init_car_poses(car_telemetry);
-					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
-
-//					car_pose_t car_pose = car_poses[1];
-					car_pose_t car_pose = {ref_x, ref_y, ref_yaw};
-
 
 					if (prev_size >= 2) {
 						car_s = end_path_s;
