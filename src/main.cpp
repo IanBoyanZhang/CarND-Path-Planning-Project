@@ -158,8 +158,6 @@ int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> ma
 
 }
 
-
-
 int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y, vector<double> maps_dx, vector<double> maps_dy)
 {
 
@@ -648,6 +646,7 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
       // Collision detection/prediction under x-y
 			if (collides_with(future_x, future_y, ego_xy[0], ego_xy[1])) {
 				time_till_collision = min(i * 0.02, time_till_collision);
+        cout << "WILL COLLIDE!" << endl;
 			}
       double dist = distance(future_x, future_y, ego_xy[0], ego_xy[1]);
 			if ( dist < min_distance ) {
@@ -683,52 +682,52 @@ traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const
 	return traj_xy;
 }
 
-//traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double ref_vel,
-//							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
-//
-//	int lane = which_lane(c.car_d);
-//	cout << "lane: " << lane << endl;
-//
-//  double d = lane_to_d(lane);
-//  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-//
-//	cout << "cost 1: " << traj_xy_1.cost << endl;
-//
-//	traj_xy_t traj_xy = traj_xy_1;
-//	if (has_left_lane(c.car_d)) {
-//
-//		lane = which_lane(c.car_d) - 1;
-//		d = lane_to_d(lane);
-//		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-//		cout << "cost GO_LEFT: " << traj_xy_left.cost << endl;
-//		// change lane!
-//
-//		cout << "car_d: " << c.car_d << endl;
-//
-//		if (traj_xy_left.cost < traj_xy.cost) {
-//			traj_xy = traj_xy_left;
-//		}
-//	}
-//
-//	if (has_right_lane(c.car_d)) {
-//
-//		lane = which_lane(c.car_d) + 1;
-//		d = lane_to_d(lane);
-//		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-//
-//		cout << "GO RIGHT: " << traj_xy_right.cost << endl;
-//		cout << "car_d: " << c.car_d << endl;
-//		// change lane!
-////		traj_xy_right.cost += 50;
-//
-//		if (traj_xy_right.cost < traj_xy.cost) {
-//			traj_xy = traj_xy_right;
-//		}
-//	}
-//
-//	// Decision
-//  return traj_xy;
-//}
+traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double ref_vel,
+							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
+
+	int lane = which_lane(c.car_d);
+	cout << "lane: " << lane << endl;
+
+  double d = lane_to_d(lane);
+  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+
+	cout << "cost 1: " << traj_xy_1.cost << endl;
+
+	traj_xy_t traj_xy = traj_xy_1;
+	if (has_left_lane(c.car_d)) {
+
+		lane = which_lane(c.car_d) - 1;
+		d = lane_to_d(lane);
+		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+		cout << "cost GO_LEFT: " << traj_xy_left.cost << endl;
+		// change lane!
+
+		cout << "car_d: " << c.car_d << endl;
+
+		if (traj_xy_left.cost < traj_xy.cost) {
+			traj_xy = traj_xy_left;
+		}
+	}
+
+	if (has_right_lane(c.car_d)) {
+
+		lane = which_lane(c.car_d) + 1;
+		d = lane_to_d(lane);
+		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+
+		cout << "GO RIGHT: " << traj_xy_right.cost << endl;
+		cout << "car_d: " << c.car_d << endl;
+		// change lane!
+//		traj_xy_right.cost += 50;
+
+		if (traj_xy_right.cost < traj_xy.cost) {
+			traj_xy = traj_xy_right;
+		}
+	}
+
+	// Decision
+  return traj_xy;
+}
 
 double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double>>& sensor_fusion,
 									 const map_waypoints_t& map_wps, int& lane, int& lane_change_wp) {
@@ -996,15 +995,15 @@ int main() {
 					ptsy.push_back(car_poses[0].y);
 					ptsy.push_back(car_poses[1].y);
           //
-//					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
-//					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
+					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
 					// Cache velocity for next simulator loop
-					ref_vel = new_plan(car_telemetry, car_pose, sensor_fusion, map_wps, lane, lane_change_wp);
+//					ref_vel = new_plan(car_telemetry, car_pose, sensor_fusion, map_wps, lane, lane_change_wp);
 
-					double d_ = 2 + 4*lane;
-          traj_xy_t traj_xy = propose_trajectory(car_telemetry, car_pose, d_, d_,
-																								 sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+//					double d_ = 2 + 4*lane;
+//          traj_xy_t traj_xy = propose_trajectory(car_telemetry, car_pose, d_, d_,
+//																								 sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
 					cout << "<<<<<<<<<<<<<< " << endl;
 
