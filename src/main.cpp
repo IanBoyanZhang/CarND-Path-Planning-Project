@@ -617,23 +617,23 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 	double time_till_collision = numeric_limits<double>::max();
 	double min_distance = numeric_limits<double>::max();
 	for (int i = 0; i < 50; i+=1) {
-		for (auto i = 0; i < sensor_fusion.size(); i+=1) {
-			id = sensor_fusion[i][CAR_ID];
-			x = sensor_fusion[i][CAR_X];
-			y = sensor_fusion[i][CAR_Y];
-			vx = sensor_fusion[i][CAR_VX];
-			vy = sensor_fusion[i][CAR_VY];
-			s = sensor_fusion[i][CAR_S];
-			d = sensor_fusion[i][CAR_D];
+		vector<double> ego_xy = {ego_traj.x[i], ego_traj.y[i]};
+		for (auto j = 0; j < sensor_fusion.size(); j+=1) {
+			id = sensor_fusion[j][CAR_ID];
+			x = sensor_fusion[j][CAR_X];
+			y = sensor_fusion[j][CAR_Y];
+			vx = sensor_fusion[j][CAR_VX];
+			vy = sensor_fusion[j][CAR_VY];
+			s = sensor_fusion[j][CAR_S];
+			d = sensor_fusion[j][CAR_D];
 			// check lane distance
-			vector<double> ego_xy = {ego_traj.x[i], ego_traj.y[i]};
 			// Check L2 distanceHopefully, there are more opportunities in the future.
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
 			future_y = y + SPEED_AUG * vy * i * 0.02;
 			future_x = x + SPEED_AUG * vx * i * 0.02;
 
       // Collision detection/prediction under x-y
-			if (collides_with(future_x, future_y, ego_traj.x[i], ego_traj.y[i])) {
+			if (collides_with(future_x, future_y, ego_xy[0], ego_xy[1])) {
 				time_till_collision = min(i * 0.02, time_till_collision);
 			}
       double dist = distance(future_x, future_y, ego_xy[0], ego_xy[1]);
