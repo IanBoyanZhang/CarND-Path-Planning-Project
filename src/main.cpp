@@ -158,7 +158,9 @@ int ClosestWaypoint(double x, double y, vector<double> maps_x, vector<double> ma
 
 }
 
-int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
+
+
+int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y, vector<double> maps_dx, vector<double> maps_dy)
 {
 
 	int closestWaypoint = ClosestWaypoint(x,y,maps_x,maps_y);
@@ -166,66 +168,76 @@ int NextWaypoint(double x, double y, double theta, vector<double> maps_x, vector
 	double map_x = maps_x[closestWaypoint];
 	double map_y = maps_y[closestWaypoint];
 
-	double heading = atan2( (map_y-y),(map_x-x) );
+	//heading vector
+	double hx = map_x-x;
+	double hy = map_y-y;
 
-	double angle = abs(theta-heading);
+	//Normal vector:
+	double nx = maps_dx[closestWaypoint];
+	double ny = maps_dy[closestWaypoint];
 
-	if(angle > pi()/4)
-	{
+	//Vector into the direction of the road (perpendicular to the normal vector)
+	double vx = -ny;
+	double vy = nx;
+
+	//If the inner product of v and h is positive then we are behind the waypoint so we do not need to
+	//increment closestWaypoint, otherwise we are beyond the waypoint and we need to increment closestWaypoint.
+
+	double inner = hx*vx+hy*vy;
+	if (inner<0.0) {
 		closestWaypoint++;
 	}
 
 	return closestWaypoint;
-
 }
 
-// Transform from Cartesian x,y coordinates to Frenet s,d coordinates
-vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
-{
-	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
-
-	int prev_wp;
-	prev_wp = next_wp-1;
-	if(next_wp == 0)
-	{
-		prev_wp  = maps_x.size()-1;
-	}
-
-	double n_x = maps_x[next_wp]-maps_x[prev_wp];
-	double n_y = maps_y[next_wp]-maps_y[prev_wp];
-	double x_x = x - maps_x[prev_wp];
-	double x_y = y - maps_y[prev_wp];
-
-	// find the projection of x onto n
-	double proj_norm = (x_x*n_x+x_y*n_y)/(n_x*n_x+n_y*n_y);
-	double proj_x = proj_norm*n_x;
-	double proj_y = proj_norm*n_y;
-
-	double frenet_d = distance(x_x,x_y,proj_x,proj_y);
-
-	//see if d value is positive or negative by comparing it to a center point
-
-	double center_x = 1000-maps_x[prev_wp];
-	double center_y = 2000-maps_y[prev_wp];
-	double centerToPos = distance(center_x,center_y,x_x,x_y);
-	double centerToRef = distance(center_x,center_y,proj_x,proj_y);
-
-	if(centerToPos <= centerToRef)
-	{
-		frenet_d *= -1;
-	}
-
-	// calculate s value
-	double frenet_s = 0;
-	for(int i = 0; i < prev_wp; i++)
-	{
-		frenet_s += distance(maps_x[i],maps_y[i],maps_x[i+1],maps_y[i+1]);
-	}
-
-	frenet_s += distance(0,0,proj_x,proj_y);
-
-	return {frenet_s,frenet_d};
-}
+//// Transform from Cartesian x,y coordinates to Frenet s,d coordinates
+//vector<double> getFrenet(double x, double y, double theta, vector<double> maps_x, vector<double> maps_y)
+//{
+//	int next_wp = NextWaypoint(x,y, theta, maps_x,maps_y);
+//
+//	int prev_wp;
+//	prev_wp = next_wp-1;
+//	if(next_wp == 0)
+//	{
+//		prev_wp  = maps_x.size()-1;
+//	}
+//
+//	double n_x = maps_x[next_wp]-maps_x[prev_wp];
+//	double n_y = maps_y[next_wp]-maps_y[prev_wp];
+//	double x_x = x - maps_x[prev_wp];
+//	double x_y = y - maps_y[prev_wp];
+//
+//	// find the projection of x onto n
+//	double proj_norm = (x_x*n_x+x_y*n_y)/(n_x*n_x+n_y*n_y);
+//	double proj_x = proj_norm*n_x;
+//	double proj_y = proj_norm*n_y;
+//
+//	double frenet_d = distance(x_x,x_y,proj_x,proj_y);
+//
+//	//see if d value is positive or negative by comparing it to a center point
+//
+//	double center_x = 1000-maps_x[prev_wp];
+//	double center_y = 2000-maps_y[prev_wp];
+//	double centerToPos = distance(center_x,center_y,x_x,x_y);
+//	double centerToRef = distance(center_x,center_y,proj_x,proj_y);
+//
+//	if(centerToPos <= centerToRef)
+//	{
+//		frenet_d *= -1;
+//	}
+//
+//	// calculate s value
+//	double frenet_s = 0;
+//	for(int i = 0; i < prev_wp; i++)
+//	{
+//		frenet_s += distance(maps_x[i],maps_y[i],maps_x[i+1],maps_y[i+1]);
+//	}
+//
+//	frenet_s += distance(0,0,proj_x,proj_y);
+//
+//	return {frenet_s,frenet_d};
+//}
 
 /**
  *
@@ -295,8 +307,11 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 // Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
 vector<vector<double>> get_wp_in_map(const double s, double d_start, const double d, const vector<double> maps_s,
 										 const vector<double> maps_x, const vector<double> maps_y) {
-	double N = 4;
-	double d_diff = (d - d_start)/N;
+//	double N = 4;
+//	double d_diff = (d - d_start)/N;
+
+	d_start = d;
+	double d_diff = 0;
 	vector<double> next_wp0 = getXY(s + 30, d_start += d_diff, maps_s, maps_x, maps_y);
 	vector<double> next_wp1 = getXY(s + 60, d_start += d_diff, maps_s, maps_x, maps_y);
 	vector<double> next_wp2 = getXY(s + 90, d_start += d_diff, maps_s, maps_x, maps_y);
@@ -512,28 +527,32 @@ double propose_lane_velocity(car_telemetry_t c, double d,
 
 	// Define trajectory parameters
 	// Too close slow down!
-	if (closest_front < BUFFER_DISTANCE && closest_front >= CLOSE_DISTANCE) {
+//	if (closest_front < BUFFER_DISTANCE && closest_front >= CLOSE_DISTANCE) {
 //		ref_vel += PID_P * (target_velocity - ref_vel);
 //		ref_vel -= .224;
-		ref_vel -= .112;
-	}
+//		ref_vel -= .112;
+//	}
 
-	if (closest_front < CLOSE_DISTANCE) {
+//	if (closest_front < CLOSE_DISTANCE) {
 //    ref_vel -= .10;
-    ref_vel -= .224;
-	}
+//    ref_vel -= .224;
+//	}
 
 //	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 49.5 && ref_vel >= 20){
-	if (closest_front >= BUFFER_DISTANCE&& ref_vel <= MAX_SPEED){
+//	if (closest_front >= BUFFER_DISTANCE&& ref_vel <= MAX_SPEED){
 //    ref_vel += PID_P * (MAX_SPEED - ref_vel);
-		ref_vel += .224;
-	}
+//		ref_vel += .224;
+//	}
 
   // low speed/cold start
 //	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 20) {
 		// .3 gives you about 9m/s^2 s acceleration
 //		ref_vel += .224;
 //	}
+
+	if (closest_front < BUFFER_DISTANCE) {
+		ref_vel = target_velocity;
+	}
 
 	cout << "closest_front: " << closest_front << endl;
 	cout << "ref_vel: " << ref_vel << endl;
@@ -544,14 +563,7 @@ double propose_lane_velocity(car_telemetry_t c, double d,
 traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_t car_pose, double ref_vel) {
 	traj_xy_t traj_xy;
 
-	vector<double> l_ptsx;
-  vector<double> l_ptsy;
-//	for (auto i = 0; i < 10; i+=1) {
-//		vector<double> l = map2local(c.previous_path_x[i], c.previous_path_y[i], car_pose);
-//		l_ptsx.push_back(l[0]);
-//		l_ptsy.push_back(l[1]);
-//	}
-
+  double car_speed = c.car_speed;
 	// smooth again doesn't really help seems
 	for (int i = 0; i < c.previous_path_x.size(); i+=1) {
 		traj_xy.x.push_back(c.previous_path_x[i]);
@@ -576,8 +588,13 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 	double speed = 0;
 
   for (int i = 0; i < 50 - c.previous_path_x.size(); i+=1) {
-//	for (int i = 0; i < 50 - 10; i+=1) {
-		double N = (target_dist/(0.02*ref_vel*0.44704));
+		if (ref_vel > car_speed) {
+			car_speed += .224;
+		} else {
+			car_speed -= .224;
+		}
+
+		double N = (target_dist/(0.02*car_speed*0.44704));
 		double x_point = x_add_on + (target_x)/N;
 		double y_point = s(x_point);
 		x_add_on = x_point;
@@ -593,9 +610,6 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 		speed = distance(prev_x, prev_y, x_point, y_point);
     prev_x = x_point;
 		prev_y = y_point;
-
-//		l_ptsx.push_back(x_point);
-//		l_ptsy.push_back(y_point);
 
 //		cout << "x_point" << x_point << endl;
 //    cout << "y_point" << y_point << endl;
@@ -661,61 +675,205 @@ traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const
 		ptsy.push_back(next_wps[i][1]);
 	}
 	tk::spline s = fit_xy(ptsx, ptsy, car_pose);
-  double _ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel);
+//  double _ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel);
+
+	// from new planner
+	double _ref_vel = ref_vel;
 	traj_xy_t traj_xy = generate_trajectory(c, s, car_pose, _ref_vel);
   double cost = predict(sensor_fusion, traj_xy, _ref_vel);
 	traj_xy.velocity = _ref_vel;
   traj_xy.cost = cost;
 
-	// CHANGE_LANE_COST
 	return traj_xy;
 }
 
-traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double ref_vel,
-							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
+//traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double ref_vel,
+//							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
+//
+//	int lane = which_lane(c.car_d);
+//	cout << "lane: " << lane << endl;
+//
+//  double d = lane_to_d(lane);
+//  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+//
+//	cout << "cost 1: " << traj_xy_1.cost << endl;
+//
+//	traj_xy_t traj_xy = traj_xy_1;
+//	if (has_left_lane(c.car_d)) {
+//
+//		lane = which_lane(c.car_d) - 1;
+//		d = lane_to_d(lane);
+//		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+//		cout << "cost GO_LEFT: " << traj_xy_left.cost << endl;
+//		// change lane!
+//
+//		cout << "car_d: " << c.car_d << endl;
+//
+//		if (traj_xy_left.cost < traj_xy.cost) {
+//			traj_xy = traj_xy_left;
+//		}
+//	}
+//
+//	if (has_right_lane(c.car_d)) {
+//
+//		lane = which_lane(c.car_d) + 1;
+//		d = lane_to_d(lane);
+//		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+//
+//		cout << "GO RIGHT: " << traj_xy_right.cost << endl;
+//		cout << "car_d: " << c.car_d << endl;
+//		// change lane!
+////		traj_xy_right.cost += 50;
+//
+//		if (traj_xy_right.cost < traj_xy.cost) {
+//			traj_xy = traj_xy_right;
+//		}
+//	}
+//
+//	// Decision
+//  return traj_xy;
+//}
 
-	int lane = which_lane(c.car_d);
-	cout << "lane: " << lane << endl;
+double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double>>& sensor_fusion,
+									 const map_waypoints_t& map_wps, int& lane, int& lane_change_wp) {
+	int next_wp = -1;
+	int prev_size = c.previous_path_x.size();
 
-  double d = lane_to_d(lane);
-  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+  double car_s = c.car_s;
 
-	cout << "cost 1: " << traj_xy_1.cost << endl;
+	double ref_x = car_pose.x;
+  double ref_y = car_pose.y;
+	double ref_yaw = car_pose.yaw;
 
-	traj_xy_t traj_xy = traj_xy_1;
-	if (has_left_lane(c.car_d)) {
+	double car_speed = c.car_speed;
 
-		lane = which_lane(c.car_d) - 1;
-		d = lane_to_d(lane);
-		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-		cout << "cost GO_LEFT: " << traj_xy_left.cost << endl;
-		// change lane!
+	double ref_vel = 49.5;
 
-		cout << "car_d: " << c.car_d << endl;
+	if(prev_size < 2)
+	{
+		next_wp = NextWaypoint(ref_x, ref_y, ref_yaw, map_wps.x,map_wps.y,map_wps.dx, map_wps.dy);
+	}
+	else
+	{
+		ref_x = c.previous_path_x[prev_size-1];
+		double ref_x_prev = c.previous_path_x[prev_size-2];
+		ref_y = c.previous_path_y[prev_size-1];
+		double ref_y_prev = c.previous_path_y[prev_size-2];
+		ref_yaw = atan2(ref_y-ref_y_prev,ref_x-ref_x_prev);
+		next_wp = NextWaypoint(ref_x,ref_y,ref_yaw,map_wps.x,map_wps.y, map_wps.dx, map_wps.dy);
 
-		if (traj_xy_left.cost < traj_xy.cost) {
-			traj_xy = traj_xy_left;
+		car_s = c.end_path_s;
+
+		car_speed = (sqrt((ref_x-ref_x_prev)*(ref_x-ref_x_prev)+(ref_y-ref_y_prev)*(ref_y-ref_y_prev))/.02)*2.237;
+	}
+
+	//find ref_v to use
+	double closestDist_s = 100000;
+	bool change_lanes = false;
+	for(int i = 0; i < sensor_fusion.size(); i++)
+	{
+		//car is in my lane
+		float d = sensor_fusion[i][6];
+		if(d < (2+4*lane+2) && d > (2+4*lane-2) )
+		{
+			double vx = sensor_fusion[i][3];
+			double vy = sensor_fusion[i][4];
+			double check_speed = sqrt(vx*vx+vy*vy);
+			double check_car_s = sensor_fusion[i][5];
+			check_car_s+=((double)prev_size*.02*check_speed);
+			//check s values greater than mine and s gap
+			if((check_car_s > car_s) && ((check_car_s-car_s) < 30) && ((check_car_s-car_s) < closestDist_s ) )
+			{
+
+				closestDist_s = (check_car_s - car_s);
+
+				if((check_car_s-car_s) > 20)
+				{
+
+					//match that cars speed
+					ref_vel = check_speed*2.237;
+					change_lanes = true;
+				}
+				else
+				{
+					//go slightly slower than the cars speed
+					ref_vel = check_speed*2.237-5;
+					change_lanes = true;
+
+				}
+			}
+
+
 		}
 	}
 
-	if (has_right_lane(c.car_d)) {
+	//try to change lanes if too close to car in front
+	if(change_lanes && ((next_wp-lane_change_wp)%map_wps.x.size() > 2))
+	{
+		bool changed_lanes = false;
+		//first try to change to left lane
+		if(lane != 0 && !changed_lanes)
+		{
+			bool lane_safe = true;
+			for(int i = 0; i < sensor_fusion.size(); i++)
+			{
+				//car is in left lane
+				float d = sensor_fusion[i][6];
+				if(d < (2+4*(lane-1)+2) && d > (2+4*(lane-1)-2) )
+				{
+					double vx = sensor_fusion[i][3];
+					double vy = sensor_fusion[i][4];
+					double check_speed = sqrt(vx*vx+vy*vy);
 
-		lane = which_lane(c.car_d) + 1;
-		d = lane_to_d(lane);
-		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+					double check_car_s = sensor_fusion[i][5];
+					check_car_s+=((double)prev_size*.02*check_speed);
+					double dist_s = check_car_s-car_s;
+					if(dist_s < 20 && dist_s > -20)
+					{
+						lane_safe = false;
+					}
+				}
+			}
+			if(lane_safe)
+			{
+				changed_lanes = true;
+				lane -= 1;
+				lane_change_wp = next_wp;
+			}
+		}
+		//next try to change to right lane
+		if(lane != 2 && !changed_lanes)
+		{
+			bool lane_safe = true;
+			for(int i = 0; i < sensor_fusion.size(); i++)
+			{
+				//car is in right lane
+				float d = sensor_fusion[i][6];
+				if(d < (2+4*(lane+1)+2) && d > (2+4*(lane+1)-2) )
+				{
+					double vx = sensor_fusion[i][3];
+					double vy = sensor_fusion[i][4];
+					double check_speed = sqrt(vx*vx+vy*vy);
 
-		cout << "GO RIGHT: " << traj_xy_right.cost << endl;
-		cout << "car_d: " << c.car_d << endl;
-		// change lane!
-//		traj_xy_right.cost += 50;
+					double check_car_s = sensor_fusion[i][5];
+					check_car_s+=((double)prev_size*.02*check_speed);
+					double dist_s = check_car_s-car_s;
+					if(dist_s < 20 && dist_s > -10)
+					{
+						lane_safe = false;
+					}
+				}
+			}
+			if(lane_safe)
+			{
+				changed_lanes = true;
+				lane += 1;
+				lane_change_wp = next_wp;
+			}
 
-		if (traj_xy_right.cost < traj_xy.cost) {
-			traj_xy = traj_xy_right;
 		}
 	}
-
-	// Decision
-  return traj_xy;
+	return ref_vel;
 }
 
 int main() {
@@ -766,7 +924,10 @@ int main() {
 															map_waypoints_dx,
 															map_waypoints_dy };
 
-  h.onMessage([&ref_vel, &map_wps, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
+	int lane = 1;
+	int lane_change_wp = 0;
+
+  h.onMessage([&ref_vel, &lane, &lane_change_wp, &map_wps, &map_waypoints_x, &map_waypoints_y, &map_waypoints_s, &map_waypoints_dx, &map_waypoints_dy](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
@@ -803,38 +964,184 @@ int main() {
 					auto sensor_fusion = j[1]["sensor_fusion"];
 
 
-					vector<double> ptsx;
-					vector<double> ptsy;
-					int prev_size = previous_path_x.size();
-
-					car_telemetry_t car_telemetry = get_telemetry(j);
-
-					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
-//					if (prev_size > 5) {
-//            for (auto i = 0; i < prev_size - 2; i+=1) {
-//							ptsx.push_back(previous_path_x[i]);
-//							ptsy.push_back(previous_path_y[i]);
-//						}
-//					}
-
-					ptsx.push_back(car_poses[0].x);
-					ptsx.push_back(car_poses[1].x);
-					ptsy.push_back(car_poses[0].y);
-					ptsy.push_back(car_poses[1].y);
-
-					car_pose_t car_pose = car_poses[1];
-          if (prev_size >= 2) {
+//					vector<double> ptsx;
+//					vector<double> ptsy;
+//					int prev_size = previous_path_x.size();
+//
+//					car_telemetry_t car_telemetry = get_telemetry(j);
+//
+//					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
+//
+//					ptsx.push_back(car_poses[0].x);
+//					ptsx.push_back(car_poses[1].x);
+//					ptsy.push_back(car_poses[0].y);
+//					ptsy.push_back(car_poses[1].y);
+//
+//					car_pose_t car_pose = car_poses[1];
+//          if (prev_size >= 2) {
 //						car_s = end_path_s;
 //						car_telemetry.car_s = car_s;
-						car_telemetry.car_speed = estimate_true_car_speed(car_poses);
+//						car_telemetry.car_speed = estimate_true_car_speed(car_poses);
+//					}
+
+					double ref_vel = 49.5; //mph
+
+					int prev_size = previous_path_x.size();
+
+					int next_wp = -1;
+					double ref_x = car_x;
+					double ref_y = car_y;
+					double ref_yaw = deg2rad(car_yaw);
+					car_telemetry_t car_telemetry = get_telemetry(j);
+					if(prev_size < 2)
+					{
+						next_wp = NextWaypoint(ref_x, ref_y, ref_yaw, map_waypoints_x,map_waypoints_y,map_waypoints_dx,map_waypoints_dy);
+					}
+					else
+					{
+						ref_x = previous_path_x[prev_size-1];
+						double ref_x_prev = previous_path_x[prev_size-2];
+						ref_y = previous_path_y[prev_size-1];
+						double ref_y_prev = previous_path_y[prev_size-2];
+						ref_yaw = atan2(ref_y-ref_y_prev,ref_x-ref_x_prev);
+						next_wp = NextWaypoint(ref_x,ref_y,ref_yaw,map_waypoints_x,map_waypoints_y,map_waypoints_dx,map_waypoints_dy);
+
+						car_s = end_path_s;
+						car_speed = (sqrt((ref_x-ref_x_prev)*(ref_x-ref_x_prev)+(ref_y-ref_y_prev)*(ref_y-ref_y_prev))/.02)*2.237;
+					}
+
+          get_init_car_poses(car_telemetry);
+					vector<car_pose_t> car_poses = get_init_car_poses(car_telemetry);
+
+//					car_pose_t car_pose = car_poses[1];
+					car_pose_t car_pose = {ref_x, ref_y, ref_yaw};
+
+
+					if (prev_size >= 2) {
+						car_s = end_path_s;
+						car_telemetry.car_s = car_s;
+						car_telemetry.car_speed = car_speed;
+					}
+
+					vector<double> ptsx;
+					vector<double> ptsy;
+
+					if(prev_size < 2)
+					{
+						double prev_car_x = car_x - cos(car_yaw);
+						double prev_car_y = car_y - sin(car_yaw);
+
+						ptsx.push_back(prev_car_x);
+						ptsx.push_back(car_x);
+
+						ptsy.push_back(prev_car_y);
+						ptsy.push_back(car_y);
+					}
+					else
+					{
+						ptsx.push_back(previous_path_x[prev_size-2]);
+						ptsx.push_back(previous_path_x[prev_size-1]);
+
+						ptsy.push_back(previous_path_y[prev_size-2]);
+						ptsy.push_back(previous_path_y[prev_size-1]);
+
+
 					}
 
           //
-					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
-					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+//					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
+//					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
 					// Cache velocity for next simulator loop
-					ref_vel = traj_xy.velocity;
+//					ref_vel = traj_xy.velocity;
+
+					ref_vel = new_plan(car_telemetry, car_pose, sensor_fusion, map_wps, lane, lane_change_wp);
+					vector<double> next_wp0 = getXY(car_s+30,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+					vector<double> next_wp1 = getXY(car_s+60,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+					vector<double> next_wp2 = getXY(car_s+90,(2+4*lane),map_waypoints_s,map_waypoints_x,map_waypoints_y);
+
+					ptsx.push_back(next_wp0[0]);
+					ptsx.push_back(next_wp1[0]);
+					ptsx.push_back(next_wp2[0]);
+
+					ptsy.push_back(next_wp0[1]);
+					ptsy.push_back(next_wp1[1]);
+					ptsy.push_back(next_wp2[1]);
+
+//					double d_ = 2 + 4*lane;
+//          traj_xy_t traj_xy = propose_trajectory(car_telemetry, car_pose, d_, d_,
+//																								 sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+//					generate_trajectory(car_telemetry, );
+
+
+
+					ref_yaw = car_pose.yaw;
+          ref_x = car_pose.x;
+					ref_y = car_pose.y;
+					for (int i = 0; i < ptsx.size(); i++ )
+					{
+
+						//shift car reference angle to 0 degrees
+						double shift_x = ptsx[i]-ref_x;
+						double shift_y = ptsy[i]-ref_y;
+
+						ptsx[i] = (shift_x *cos(0-ref_yaw)-shift_y*sin(0-ref_yaw));
+						ptsy[i] = (shift_x *sin(0-ref_yaw)+shift_y*cos(0-ref_yaw));
+
+					}
+					tk::spline s;
+
+
+					s.set_points(ptsx,ptsy);
+
+
+          traj_xy_t traj_xy;
+
+					for(int i = 0; i < previous_path_x.size(); i++)
+					{
+						traj_xy.x.push_back(previous_path_x[i]);
+						traj_xy.y.push_back(previous_path_y[i]);
+					}
+
+					car_speed = car_telemetry.car_speed;
+
+					double target_x = 30.0;
+					double target_y = s(target_x);
+					double target_dist = sqrt((target_x)*(target_x)+(target_y)*(target_y));
+
+					double x_add_on = 0;
+
+					for (int i = 1; i <= 50-previous_path_x.size(); i++) {
+
+						if(ref_vel > car_speed)
+						{
+							car_speed+=.224;
+						}
+						else if(ref_vel < car_speed)
+						{
+							car_speed-=.224;
+						}
+
+
+						double N = (target_dist/(.02*car_speed/2.24));
+						double x_point = x_add_on+(target_x)/N;
+						double y_point = s(x_point);
+
+						x_add_on = x_point;
+
+						double x_ref = x_point;
+						double y_ref = y_point;
+
+						x_point = (x_ref *cos(ref_yaw)-y_ref*sin(ref_yaw));
+						y_point = (x_ref *sin(ref_yaw)+y_ref*cos(ref_yaw));
+
+						x_point += ref_x;
+						y_point += ref_y;
+
+
+						traj_xy.x.push_back(x_point);
+						traj_xy.y.push_back(y_point);
+					}
 					cout << "<<<<<<<<<<<<<< " << endl;
 
           json msgJson;
