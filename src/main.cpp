@@ -33,13 +33,13 @@ using namespace std;
 #define MAX_LANE_ID 2;
 #define MIN_LANE_ID 0;
 
-const double SAME_LANE = 2;
-const double CLOSE_DISTANCE = 15;
-const double BUFFER_DISTANCE = 30;
-const double DETECTION_DISTANCE = 140;
-const double COLLISION_DISTANCE = 5;
+const double SAME_LANE = 3.8;
+const double CLOSE_DISTANCE = 30;
+const double BUFFER_DISTANCE = 40;
+const double DETECTION_DISTANCE = 80;
+const double COLLISION_DISTANCE = 6;
 //const double COLLISION_BUFFER = 60;
-const double COLLISION_BUFFER = 20;
+const double COLLISION_BUFFER = 30;
 
 const double SPEED_AUG = 1.2;
 
@@ -293,12 +293,14 @@ vector<double> getXY(double s, double d, vector<double> maps_s, vector<double> m
 }
 
 // Transform from Frenet s,d coordinates to Cartesian X,Y using different local strategy
-vector<vector<double>> get_wp_in_map(const double s, const double d, const vector<double> maps_s,
+vector<vector<double>> get_wp_in_map(const double s, double d_start, const double d, const vector<double> maps_s,
 										 const vector<double> maps_x, const vector<double> maps_y) {
-	vector<double> next_wp0 = getXY(s + 30, d, maps_s, maps_x, maps_y);
-	vector<double> next_wp1 = getXY(s + 60, d, maps_s, maps_x, maps_y);
-	vector<double> next_wp2 = getXY(s + 90, d, maps_s, maps_x, maps_y);
-	vector<double> next_wp3 = getXY(s + 120, d, maps_s, maps_x, maps_y);
+	double N = 4;
+	double d_diff = (d - d_start)/N;
+	vector<double> next_wp0 = getXY(s + 30, d_start += d_diff, maps_s, maps_x, maps_y);
+	vector<double> next_wp1 = getXY(s + 60, d_start += d_diff, maps_s, maps_x, maps_y);
+	vector<double> next_wp2 = getXY(s + 90, d_start += d_diff, maps_s, maps_x, maps_y);
+	vector<double> next_wp3 = getXY(s + 120, d_start += d_diff, maps_s, maps_x, maps_y);
 
 	vector<vector<double>> next_wps;
   next_wps.push_back(next_wp0);
@@ -511,9 +513,9 @@ double propose_lane_velocity(car_telemetry_t c, double d,
 	// Define trajectory parameters
 	// Too close slow down!
 	if (closest_front < BUFFER_DISTANCE && closest_front >= CLOSE_DISTANCE) {
-		ref_vel += PID_P * (target_velocity - ref_vel);
+//		ref_vel += PID_P * (target_velocity - ref_vel);
 //		ref_vel -= .224;
-//		ref_vel -= .112;
+		ref_vel -= .112;
 	}
 
 	if (closest_front < CLOSE_DISTANCE) {
@@ -523,8 +525,8 @@ double propose_lane_velocity(car_telemetry_t c, double d,
 
 //	if (closest_front >= BUFFER_DISTANCE && ref_vel <= 49.5 && ref_vel >= 20){
 	if (closest_front >= BUFFER_DISTANCE&& ref_vel <= MAX_SPEED){
-    ref_vel += PID_P * (MAX_SPEED - ref_vel);
-//		ref_vel += .224;
+//    ref_vel += PID_P * (MAX_SPEED - ref_vel);
+		ref_vel += .224;
 	}
 
   // low speed/cold start
@@ -653,7 +655,7 @@ traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const
 														 const vector<vector<double> >& sensor_fusion, double ref_vel, const map_waypoints_t& map_wps,
 														 vector<double> ptsx, vector<double>ptsy) {
 	double car_s = c.car_s;
-	vector<vector<double> > next_wps = get_wp_in_map(car_s, d, map_wps.s, map_wps.x, map_wps.y);
+	vector<vector<double> > next_wps = get_wp_in_map(car_s, d_start, d, map_wps.s, map_wps.x, map_wps.y);
 	for (auto i = 0; i < next_wps.size(); i+=1) {
 		ptsx.push_back(next_wps[i][0]);
 		ptsy.push_back(next_wps[i][1]);
@@ -666,7 +668,6 @@ traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const
   traj_xy.cost = cost;
 
 	// CHANGE_LANE_COST
-//	traj_xy.cost += change_lane_cost(d, c.car_d);
 	return traj_xy;
 }
 
