@@ -991,27 +991,10 @@ int main() {
 					vector<double> ptsx;
 					vector<double> ptsy;
 
-					if(prev_size < 2)
-					{
-						double prev_car_x = car_x - cos(car_yaw);
-						double prev_car_y = car_y - sin(car_yaw);
-
-						ptsx.push_back(prev_car_x);
-						ptsx.push_back(car_x);
-
-						ptsy.push_back(prev_car_y);
-						ptsy.push_back(car_y);
-					}
-					else
-					{
-						ptsx.push_back(previous_path_x[prev_size-2]);
-						ptsx.push_back(previous_path_x[prev_size-1]);
-
-						ptsy.push_back(previous_path_y[prev_size-2]);
-						ptsy.push_back(previous_path_y[prev_size-1]);
-
-					}
-
+          ptsx.push_back(car_poses[0].x);
+					ptsx.push_back(car_poses[1].x);
+					ptsy.push_back(car_poses[0].y);
+					ptsy.push_back(car_poses[1].y);
           //
 //					cout << "Estimated car_speed" << car_telemetry.car_speed <<endl;
 //					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
