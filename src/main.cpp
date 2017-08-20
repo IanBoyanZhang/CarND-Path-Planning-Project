@@ -36,8 +36,8 @@ using namespace std;
 const double SAME_LANE = 3.8;
 const double CLOSE_DISTANCE = 30;
 const double BUFFER_DISTANCE = 40;
-const double DETECTION_DISTANCE = 80;
-const double COLLISION_DISTANCE = 6;
+const double DETECTION_DISTANCE = 60;
+const double COLLISION_DISTANCE = 3.9;
 //const double COLLISION_BUFFER = 60;
 const double COLLISION_BUFFER = 30;
 
@@ -58,7 +58,7 @@ const double PID_P = 0.05;
 // OUT OF LANE
 
 // static double COLLISION = 1e6;
-static double EFFICIENCY = 1e3;
+static double EFFICIENCY = 1e2;
 static const double CHANGE_LANE_COST = 0.1;
 // static double MOVE_TO_LEFT_LANE = 5;
 //static double DESIRED_BUFFER = 80;
@@ -313,13 +313,11 @@ vector<vector<double>> get_wp_in_map(const double s, double d_start, const doubl
 	vector<double> next_wp0 = getXY(s + 30, d_start += d_diff, maps_s, maps_x, maps_y);
 	vector<double> next_wp1 = getXY(s + 60, d_start += d_diff, maps_s, maps_x, maps_y);
 	vector<double> next_wp2 = getXY(s + 90, d_start += d_diff, maps_s, maps_x, maps_y);
-	vector<double> next_wp3 = getXY(s + 120, d_start += d_diff, maps_s, maps_x, maps_y);
 
 	vector<vector<double>> next_wps;
   next_wps.push_back(next_wp0);
 	next_wps.push_back(next_wp1);
 	next_wps.push_back(next_wp2);
-	next_wps.push_back(next_wp3);
 
   return next_wps;
 }
@@ -646,7 +644,7 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
       // Collision detection/prediction under x-y
 			if (collides_with(future_x, future_y, ego_xy[0], ego_xy[1])) {
 				time_till_collision = min(i * 0.02, time_till_collision);
-        cout << "WILL COLLIDE!" << endl;
+        cout << "COLLIDING!" << endl;
 			}
       double dist = distance(future_x, future_y, ego_xy[0], ego_xy[1]);
 			if ( dist < min_distance ) {
@@ -689,7 +687,9 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 	cout << "lane: " << lane << endl;
 
   double d = lane_to_d(lane);
-  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+	double _ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel);
+//  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+	traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
 
 	cout << "cost 1: " << traj_xy_1.cost << endl;
 
@@ -698,7 +698,8 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 
 		lane = which_lane(c.car_d) - 1;
 		d = lane_to_d(lane);
-		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+		_ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel);
+		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
 		cout << "cost GO_LEFT: " << traj_xy_left.cost << endl;
 		// change lane!
 
@@ -713,7 +714,8 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 
 		lane = which_lane(c.car_d) + 1;
 		d = lane_to_d(lane);
-		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
+		_ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel);
+		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
 
 		cout << "GO RIGHT: " << traj_xy_right.cost << endl;
 		cout << "car_d: " << c.car_d << endl;
@@ -724,6 +726,9 @@ traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<doub
 			traj_xy = traj_xy_right;
 		}
 	}
+
+	// All track fails to find fall back
+//	if ()
 
 	// Decision
   return traj_xy;
