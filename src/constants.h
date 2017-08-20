@@ -36,7 +36,7 @@ static double DESIRED_DISTANCE_BUFFER = 6; // 6meter
 // Trajectory generation
 // s_dot max over a second
 // static double MAX_SPEED = 24; // mps to 55 mph
-static double MAX_SPEED = 23; // mps to 51.5 mph
+static double MAX_SPEED = 49.5; // mps to 51.5 mph
 //static double MAX_ACCEL = ?
 // Max s, d accel?
 // Pertubation
