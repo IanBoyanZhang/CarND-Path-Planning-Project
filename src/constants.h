@@ -29,7 +29,7 @@ static double COLLIDE_THRESHOLD = 2.5;
 // center difference in 1 meter, considering the two vehicles in same lane
 // Overlap
 static double SAME_LANE_DETECTION_THRESHOLD = 1;
-static double NO_COLLISION_THRESHOLD = 1e6; //s
+static double NO_COLLISION_THRESHOLD = 2 * 1e6; //s
 static double TARGET_SPEED = 49; // mph // should it be under SI?
 static double DESIRED_DISTANCE_BUFFER = 6; // 6meter
 
