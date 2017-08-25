@@ -1,11 +1,11 @@
-## Reflections
+## Reflection
 
 This is an interesting project, challenging in different way. I took down the projects and rebuild it a few times 
 before being able to make it to a stage that can pass the requirements. 
 
-A lot of time and effort was spent on figuring out reasonable way to control vehicle to drive along track. Leaving less time to learn real path planning contents.
+A lot of time and effort was spent on figuring out reasonable way to control vehicle to drive along track. Leaving less time to learn real path planning content.
 
-Instead having direct control input such as throttle, steering angle and etc, we have to feed proposed points into simulator teleports the car to the location sent into in a indeterministic rate which makes controlling a vehicle tricky and confusing from time to time. Maybe the reasoning behind it is to 
+Instead having direct control input such as throttle, steering angle and etc, we have to feed proposed points into simulator teleporting the car to the location sent into in a indeterministic rate which makes controlling a vehicle tricky and confusing from time to time. Maybe the reasoning behind it is to 
 avoid directly considering vehicle dynamics and control.
 
 Per introduction of the nano program, I am eager to learn how in real world vehicle dynamics 
@@ -14,16 +14,16 @@ we can learn how vehicle dynamics is involved in motion control. However the act
 
 To complete this project, three major issues need to be addressed:
 
-Trajectory generation
+__Trajectory generation__
 Based on the desired immediate behavior, the trajectory planning component will determine which trajectory is best for executing this behavior.
 
-Prediction
+__Prediction__
 The prediction component estimates what actions other objects might take in the future. For example, if another vehicle were identified, the prediction component would estimate its future trajectory.
 
-Behavioral planning
+__Behavioral planning__
 The behavioral planning component determines what behavior the vehicle should exhibit. For example stopping at a traffic light or intersection, changing lanes.
 
-Model Documentation:
+__Model Documentation__:
 
 Trajectory generation
 
@@ -38,6 +38,7 @@ that makes the trajectories generated meet jerk and acceleration requirements co
 In this submission, spline interpolated trajectories are planned and generated in ego Cartesian coordinates. 30 meter spaced navigation points in Frenet spaces are used for proposing trajectories. It really helps to avoid excessive local non-linearity when performaing coordinate transformation.   
 Planning and generating trajectory under local/ego coordinates also help deal with waypoints wrapping around issue. Affine transformation between local and map coordinates keep linearity of car poses under two representations which is less prone to numerical issues.
 
-As suggested in project introduction `target_x` is a emperical estimated based on proposed distance change between two time steps (approximately 0.02s). 
+As suggested in project introduction `target_x` is a emperical estimated based on proposed distance change between two time steps (approximately `0.02s`). 
 
 Prediction and planner are coupled, it is a work in progress, originally, several cost function was used to drive path decision, unless, it is fined tuned with multiple reasonable assumptions and other vehicle estimation, for the time being, under simpler cases like in high way driving, a simple condition rule based state machine can provide similar perforamnce.
+Video can be found [Here](https://www.youtube.com/watch?v=2c0DwvOTF5s&t=121s)
