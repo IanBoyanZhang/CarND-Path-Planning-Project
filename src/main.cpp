@@ -11,8 +11,6 @@
 #include <limits>
 #include "spline.h"
 
-#include "constants.h"
-
 using namespace std;
 
 // Constants
@@ -39,16 +37,36 @@ const double BUFFER_DISTANCE = 30;
 const double DETECTION_DISTANCE = 120;
 const double COLLISION_DISTANCE = 15;
 //const double COLLISION_BUFFER = 60;
-const double COLLISION_BUFFER = 30;
+const double COLLISION_BUFFER = 20;
 
 const double SPEED_AUG = 1.2;
 
-const double MAX_DIST_DIFF = 0.427;
+static double _MAX_S = 6914.14925765991;
 
-const double PID_P = 0.05;
+// Threshold
+static double MAX_SPEED = 49.5; // mps to 51.5 mph
+static double COLLISION = 1e6;
+// Distance
+static double DANGER = 1e4;
 
-// In constants.h
-//const double MAX_SPEED = 46;
+// States definition
+/*
+ * "KL" - Keep Lane
+ * The vehicle will attempt to drive its target speed, unless there is
+ * traffic in front of it, in which case it will slow down.
+ *
+ * "KLF" - Keep Lane Following
+ *
+ * "LCL" or "LCR" - Lane Change Left / Right
+ * The vehicle will IMMEDIATELY change lanes and then follow longitudinal
+ * behavior for the "KL" state in the new lane.
+ *
+ * "PLCL" or "PLCR" - Prepare for Lane Change Left / Right
+ * The vehicle will find the nearest vehicle in the adjacent lane which is
+ * BEHIND itself and will adjust speed to try to get behind that vehicle.
+ */
+// 0, 1, 2, 3, 4
+enum State {KL, KLF, LCL, LCR, PLCL, PLCR};
 
 // Four types of incidents
 // COLLISION
@@ -57,11 +75,15 @@ const double PID_P = 0.05;
 // MAX SPEED
 // OUT OF LANE
 
-// static double COLLISION = 1e6;
 static double EFFICIENCY = 1e2;
 static const double CHANGE_LANE_COST = 10;
 // static double MOVE_TO_LEFT_LANE = 5;
 //static double DESIRED_BUFFER = 80;
+
+// Speed conversion
+const double MPS_TO_MPH = 2.23694;
+// Unit time difference consumered by simulator
+const double T_DIFF = 0.02;
 
 struct car_telemetry_t {
 	double car_x;
@@ -98,11 +120,6 @@ struct map_waypoints_t {
 	vector<double> s;
 	vector<double> dx;
 	vector<double> dy;
-};
-
-struct predict_params_t {
-	double ref_vel;
-	double closest_front;
 };
 
 
@@ -341,7 +358,7 @@ vector<car_pose_t> get_init_car_poses(const car_telemetry_t& c) {
 }
 
 double estimate_true_car_speed(const vector<car_pose_t>& car_poses) {
-	return distance(car_poses[1].x, car_poses[1].y, car_poses[0].x, car_poses[0].y) / 0.02 * 2.237;
+	return distance(car_poses[1].x, car_poses[1].y, car_poses[0].x, car_poses[0].y) / T_DIFF * MPS_TO_MPH;
 };
 
 vector<double> map2local(const double map_x, const double map_y, const car_pose_t car_pose)
@@ -469,7 +486,7 @@ double propose_lane_velocity(car_telemetry_t c, int lane,
 		car_vy = sensor_fusion[closest_id][CAR_VY];
 		closest_front = (double)sensor_fusion[closest_id][CAR_S] - ego_s;
 		// mps to mph
-		target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2)) * 2.237;
+		target_velocity = sqrt(pow(car_vx, 2) + pow(car_vy, 2)) * MPS_TO_MPH;
 	}
 
 	if (closest_front < BUFFER_DISTANCE) {
@@ -497,8 +514,8 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 		traj_xy.y.push_back(c.previous_path_y[i]);
 	}
 
-  double target_x = 60.0;
-//	double target_x = 50.0;
+//  double target_x = 60.0;
+	double target_x = 40.0;
 	double target_y = s(target_x);
 	double target_dist = sqrt(pow(target_x, 2) + pow(target_y, 2));
 
@@ -516,12 +533,12 @@ traj_xy_t generate_trajectory(const car_telemetry_t& c, tk::spline& s, car_pose_
 
   for (int i = 0; i < 50 - c.previous_path_x.size(); i+=1) {
 		if (ref_vel > car_speed) {
-			car_speed += .224;
+			car_speed += .200;
 		} else {
-			car_speed -= .224;
+			car_speed -= .200;
 		}
 
-		double N = (target_dist/(0.02*car_speed*0.44704));
+		double N = (target_dist/(T_DIFF*car_speed)*MPS_TO_MPH);
 		double x_point = x_add_on + (target_x)/N;
 		double y_point = s(x_point);
 		x_add_on = x_point;
@@ -569,12 +586,12 @@ double predict(const vector<vector<double>>& sensor_fusion, traj_xy_t ego_traj, 
 			// check lane distance
 			// Check L2 distanceHopefully, there are more opportunities in the future.
 			if (distance(x, y, ego_xy[0], ego_xy[1]) > DETECTION_DISTANCE) { continue; }
-			future_y = y + SPEED_AUG * vy * i * 0.02;
-			future_x = x + SPEED_AUG * vx * i * 0.02;
+			future_y = y + SPEED_AUG * vy * i * T_DIFF;
+			future_x = x + SPEED_AUG * vx * i * T_DIFF;
 
 			// Collision detection/prediction under x-y
 			if (collides_with(future_x, future_y, ego_xy[0], ego_xy[1])) {
-				time_till_collision = min(i * 0.02, time_till_collision);
+				time_till_collision = min(i * T_DIFF, time_till_collision);
 			}
 			double dist = distance(future_x, future_y, ego_xy[0], ego_xy[1]);
 			if (dist < min_distance) {
@@ -610,68 +627,6 @@ traj_xy_t propose_trajectory(const car_telemetry_t c, car_pose_t car_pose, const
 	return traj_xy;
 }
 
-traj_xy_t plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double> >& sensor_fusion, double ref_vel,
-							 const map_waypoints_t& map_wps, vector<double>ptsx, vector<double>ptsy) {
-
-	int lane = which_lane(c.car_d);
-	cout << "lane: " << lane << endl;
-
-	double original_lane = lane;
-
-  double d = lane_to_d(lane);
-	double _ref_vel = propose_lane_velocity(c, d, sensor_fusion, MAX_SPEED);
-//  traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-	traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
-
-	cout << "cost 1: " << traj_xy_1.cost << endl;
-
-	traj_xy_t traj_xy = traj_xy_1;
-	if (has_left_lane(c.car_d)) {
-
-		lane = which_lane(c.car_d) - 1;
-		d = lane_to_d(lane);
-		_ref_vel = propose_lane_velocity(c, d, sensor_fusion, MAX_SPEED);
-		traj_xy_t traj_xy_left = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
-		cout << "cost GO_LEFT: " << traj_xy_left.cost << endl;
-		// change lane!
-
-		cout << "car_d: " << c.car_d << endl;
-
-		if (traj_xy_left.cost < traj_xy.cost) {
-			traj_xy = traj_xy_left;
-		}
-	}
-
-	if (has_right_lane(c.car_d)) {
-
-		lane = which_lane(c.car_d) + 1;
-		d = lane_to_d(lane);
-		_ref_vel = propose_lane_velocity(c, d, sensor_fusion, MAX_SPEED);
-		traj_xy_t traj_xy_right = propose_trajectory(c, car_pose, c.car_d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
-
-		cout << "GO RIGHT: " << traj_xy_right.cost << endl;
-		cout << "car_d: " << c.car_d << endl;
-		// change lane!
-//		traj_xy_right.cost += 50;
-
-		if (traj_xy_right.cost < traj_xy.cost) {
-			traj_xy = traj_xy_right;
-		}
-	}
-
-	// All track fails to fall back to slower speed
-	if (traj_xy.cost > 5 * 1e5) {
-		cout << "FALL BACK!!!" << endl;
-		double d = lane_to_d(original_lane);
-		double _ref_vel = propose_lane_velocity(c, d, sensor_fusion, ref_vel - 2);
-		traj_xy_t traj_xy_1 = propose_trajectory(c, car_pose, d, d, sensor_fusion, _ref_vel, map_wps, ptsx, ptsy);
-    traj_xy = traj_xy_1;
-	}
-
-	// Decision
-  return traj_xy;
-}
-
 double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<double>>& sensor_fusion,
 								const map_waypoints_t& map_wps, int& lane, int& lane_change_wp) {
 	int next_wp = -1;
@@ -685,7 +640,7 @@ double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<dou
 
 	double car_speed = c.car_speed;
 
-	double ref_vel = 49.5;
+	double ref_vel = MAX_SPEED;
 
 	if(prev_size < 2)
 	{
@@ -702,15 +657,14 @@ double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<dou
 
 		car_s = c.end_path_s;
 
-		car_speed = (sqrt((ref_x-ref_x_prev)*(ref_x-ref_x_prev)+(ref_y-ref_y_prev)*(ref_y-ref_y_prev))/.02)*2.237;
+		car_speed = (sqrt((ref_x-ref_x_prev)*(ref_x-ref_x_prev)+(ref_y-ref_y_prev)*(ref_y-ref_y_prev))/T_DIFF)*MPS_TO_MPH;
 	}
 
-	//find ref_v to use
-	double closestDist_s = 100000;
+	double closestDist_s = numeric_limits<double>::max();
 	bool change_lanes = false;
 	for(int i = 0; i < sensor_fusion.size(); i++)
 	{
-		//car is in my lane
+		//in my lane
 		float d = sensor_fusion[i][6];
 		if(d < (2+4*lane+2) && d > (2+4*lane-2) )
 		{
@@ -718,24 +672,24 @@ double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<dou
 			double vy = sensor_fusion[i][4];
 			double check_speed = sqrt(vx*vx+vy*vy);
 			double check_car_s = sensor_fusion[i][5];
-			check_car_s+=((double)prev_size*.02*check_speed);
+			check_car_s+=((double)prev_size*T_DIFF*check_speed);
 			//check s values greater than mine and s gap
-			if((check_car_s > car_s) && ((check_car_s-car_s) < 30) && ((check_car_s-car_s) < closestDist_s ) )
+			if((check_car_s > car_s) && ((check_car_s-car_s) < BUFFER_DISTANCE) && ((check_car_s-car_s) < closestDist_s ) )
 			{
 
 				closestDist_s = (check_car_s - car_s);
 
-				if((check_car_s-car_s) > 20)
+				if((check_car_s-car_s) > COLLISION_BUFFER)
 				{
 
 					//match that cars speed
-					ref_vel = check_speed*2.237;
+					ref_vel = check_speed*MPS_TO_MPH;
 					change_lanes = true;
 				}
 				else
 				{
 					//go slightly slower than the cars speed
-					ref_vel = check_speed*2.237-5;
+					ref_vel = check_speed*MPS_TO_MPH-5;
 					change_lanes = true;
 
 				}
@@ -764,9 +718,9 @@ double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<dou
 					double check_speed = sqrt(vx*vx+vy*vy);
 
 					double check_car_s = sensor_fusion[i][5];
-					check_car_s+=((double)prev_size*.02*check_speed);
+					check_car_s+=((double)prev_size*T_DIFF*check_speed);
 					double dist_s = check_car_s-car_s;
-					if(dist_s < 20 && dist_s > -20)
+					if(dist_s < COLLISION_BUFFER && dist_s > -COLLISION_BUFFER)
 					{
 						lane_safe = false;
 					}
@@ -794,7 +748,7 @@ double new_plan(car_telemetry_t& c, car_pose_t car_pose, const vector<vector<dou
 					double check_speed = sqrt(vx*vx+vy*vy);
 
 					double check_car_s = sensor_fusion[i][5];
-					check_car_s+=((double)prev_size*.02*check_speed);
+					check_car_s+=((double)prev_size*T_DIFF*check_speed);
 					double dist_s = check_car_s-car_s;
 					if(dist_s < 20 && dist_s > -10)
 					{
@@ -901,7 +855,7 @@ int main() {
 					// Sensor Fusion Data, a list of all other cars on the same side of the road.
 					auto sensor_fusion = j[1]["sensor_fusion"];
 
-					double ref_vel = 49.5; //mph
+					double ref_vel = MAX_SPEED; //mph
 
 					int prev_size = previous_path_x.size();
 
@@ -928,14 +882,12 @@ int main() {
 					ptsx.push_back(car_poses[1].x);
 					ptsy.push_back(car_poses[0].y);
 					ptsy.push_back(car_poses[1].y);
-//					traj_xy_t traj_xy = plan(car_telemetry, car_pose, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
 
 					// Cache velocity for next simulator loop
 					ref_vel = new_plan(car_telemetry, car_pose, sensor_fusion, map_wps, lane, lane_change_wp);
 
 					double d_ = 2 + 4*lane;
           traj_xy_t traj_xy = propose_trajectory(car_telemetry, car_pose, d_, d_, sensor_fusion, ref_vel, map_wps, ptsx, ptsy);
-					cout << "<<<<<<<<<<<<<< " << endl;
 
           json msgJson;
 					msgJson["next_x"] = traj_xy.x;
